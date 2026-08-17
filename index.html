@@ -724,6 +724,42 @@ function evaluateWindow(ev, depHH, retHH){
           turnsBadAt: turns && turns.hh !== depHH ? turns.hh : null, span, reasons};
 }
 
+/* Given the plan the user typed, look for a nearby shift that is genuinely
+   better while keeping roughly the same time ashore. A suggestion to go for
+   one hour instead of six is not a useful suggestion. */
+function suggestShift(ev, win, maxShiftH=5, ashoreTolH=1.5){
+  const rank = {green:0,yellow:1,red:2,unknown:3};
+  const hrs = ev.hours.map(h=>h.hh);
+  const hnum = hh => +hh.slice(0,2);
+  const userAshore = hnum(win.retHH) - hnum(win.depHH);
+  const userPenalty = win.span.reduce((s,h)=>s+rank[h.band],0);
+
+  let best = null;
+  for(const dep of hrs) for(const ret of hrs){
+    if(hnum(ret) <= hnum(dep)) continue;
+    const ashore = hnum(ret) - hnum(dep);
+    if(Math.abs(ashore - userAshore) > ashoreTolH) continue;
+    const shift = Math.max(Math.abs(hnum(dep)-hnum(win.depHH)),
+                           Math.abs(hnum(ret)-hnum(win.retHH)));
+    if(shift === 0 || shift > maxShiftH) continue;
+    const w = evaluateWindow(ev, dep, ret);
+    if(!w) continue;
+    w.penalty = w.span.reduce((s,h)=>s+rank[h.band],0);
+    w.shift = shift; w.ashore = ashore;
+    w.earlier = hnum(dep) < hnum(win.depHH);
+    /* Only suggest a genuine upgrade in verdict. Shuffling a red day into a
+       slightly less red day is not worth telling anyone about — red is red. */
+    if(rank[w.verdict] >= rank[win.verdict]) continue;
+    if(!best) { best = w; continue; }
+    const better = rank[w.verdict] - rank[best.verdict]
+                || w.shift - best.shift          // prefer the smallest change
+                || w.penalty - best.penalty
+                || best.ashore - w.ashore;
+    if(better < 0) best = w;
+  }
+  return best;
+}
+
 function bestWindows(ev, minAshore=2, top=4){
   const rank = {green:0,yellow:1,red:2};
   const cand = [];
@@ -1015,6 +1051,27 @@ function render(ev, win, model){
       const uniq = win.reasons.filter(r => !seen.has(r.leg+r.t) && seen.add(r.leg+r.t));
       h += `<ul class="why">${uniq.map(r=>`<li class="${r.bad?"bad":""}"><strong>${esc(r.leg)}:</strong> ${esc(r.t)}</li>`).join("")}</ul>`;
     }
+
+    const alt = suggestShift(ev, win);
+    if(alt){
+      const dir = alt.earlier ? "earlier" : "later";
+      const same = Math.abs(alt.ashore - (+win.retHH.slice(0,2) - +win.depHH.slice(0,2))) < 0.5;
+      h += `<div class="suggest" data-dep="${alt.depHH}" data-ret="${alt.retHH}">
+        <span class="lbl">Shifting ${alt.shift} ${alt.shift===1?"hour":"hours"} ${dir} is better</span>
+        <div class="times">${pretty(alt.depHH)} &rarr; ${pretty(alt.retHH)}
+          <span class="v b-${alt.verdict}">${WORD[alt.verdict]}</span></div>
+        <div class="w">${same ? `Same time ashore (${alt.ashore} h)` : `${alt.ashore} hours ashore`},
+          and it goes from <strong>${WORD[win.verdict]}</strong> to
+          <strong>${WORD[alt.verdict]}</strong>. Tap to load these times.</div></div>`;
+    } else if(win.verdict === "red"){
+      h += `<div class="note warn">No shift within five hours either way turns this into a workable
+        day — the bad weather covers too much of it. Try a shorter trip, a sheltered destination
+        (${esc(route.cheat ? route.cheat.bail : "Portland Island")}), or another day.</div>`;
+    } else if(win.verdict === "yellow"){
+      h += `<div class="note">Nothing nearby upgrades this to a clean Go, so if you want easy water
+        it's a different destination or a different day. Marginal is still doable — just shorten it
+        and watch the return.</div>`;
+    }
   }
 
   h += `<h2>Hour by hour</h2>` + renderRibbon(ev, win ? [win.depHH, win.retHH] : null);
@@ -1031,9 +1088,31 @@ function render(ev, win, model){
        <p class="hint">Tap a row to load those times into the form.</p>`
     : `<div class="note">No workable window today for this destination.</div>`;
 
-  const focusHH = win ? win.depHH : (ev.hours[Math.floor(ev.hours.length/2)]?.hh);
-  const focus = ev.hours.find(x=>x.hh===focusHH);
-  h += `<h2>Legs at ${pretty(focusHH)}</h2>` + renderLegs(focus);
+  /* With a plan set, show BOTH ends of the trip. The return leg is usually the
+     one that matters — the afternoon builds while you're out there. */
+  if(win){
+    const out  = ev.hours.find(x=>x.hh===win.depHH);
+    const back = ev.hours.find(x=>x.hh===win.retHH);
+    const badge = b => `<span class="b-${b}" style="font:400 15px var(--cond);letter-spacing:.06em">${WORD[b]}</span>`;
+    h += `<h2>Going out — ${pretty(win.depHH)} &nbsp;${badge(out ? out.band : "green")}</h2>`
+       + renderLegs(out);
+    h += `<h2>Coming back — ${pretty(win.retHH)} &nbsp;${badge(back ? back.band : "green")}</h2>`
+       + renderLegs(back);
+    if(out && back){
+      const hOut = Math.max(...out.legs.map(l=>l.hs));
+      const hBack = Math.max(...back.legs.map(l=>l.hs));
+      const delta = hBack - hOut;
+      if(Math.abs(delta) >= 0.1)
+        h += `<div class="note ${delta>0?"warn":""}">The way home is
+          <strong>${delta>0?"worse":"better"}</strong> than the way out —
+          ${hOut.toFixed(2)} m going, ${hBack.toFixed(2)} m coming back.
+          ${delta>0?"Plan the return at the slower speed, and consider leaving earlier.":""}</div>`;
+    }
+  } else {
+    const focusHH = ev.hours[Math.floor(ev.hours.length/2)]?.hh;
+    const focus = ev.hours.find(x=>x.hh===focusHH);
+    h += `<h2>Legs at ${pretty(focusHH)}</h2>` + renderLegs(focus);
+  }
 
   const first = route.legs[0];
   const _d = new Date(ev.hours[0].ms);
@@ -1059,6 +1138,11 @@ function render(ev, win, model){
     resolve how wind funnels between the islands.</div>`;
 
   document.getElementById("out").innerHTML = h;
+  document.querySelectorAll(".suggest").forEach(el => el.onclick = () => {
+    document.getElementById("depart").value = el.dataset.dep;
+    document.getElementById("ret").value = el.dataset.ret;
+    run();
+  });
   document.querySelectorAll("tr.pick").forEach(tr => tr.onclick = () => {
     document.getElementById("depart").value = tr.dataset.dep;
     document.getElementById("ret").value = tr.dataset.ret;
