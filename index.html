@@ -1,0 +1,1117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B1418">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boat check">
+<meta name="color-scheme" content="dark">
+<title>Boat check — Sidney &amp; the southern Gulf Islands</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --hull:#0B1418; --panel:#11212A; --panel2:#16303C; --rule:#1E3540; --rule-hi:#2C4B59;
+  --text:#D7E3E7; --dim:#7E97A1; --faint:#55707C;
+  --go:#4FB286; --marg:#E0A33E; --stop:#D8563F; --mark:#5BC8D4;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,monospace;
+  --cond:"Barlow Condensed",system-ui,sans-serif;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--hull);color:var(--text);font:400 15px/1.65 var(--sans)}
+.wrap{max-width:1040px;margin:0 auto;
+  padding:max(30px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right))
+          max(90px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left))}
+
+.eyebrow{font:500 12px/1 var(--cond);letter-spacing:.24em;text-transform:uppercase;color:var(--dim);margin:0 0 6px}
+h1{font:400 clamp(30px,7vw,46px)/1.02 var(--cond);letter-spacing:.01em;margin:0 0 4px}
+.sub{color:var(--dim);font:400 13px/1.6 var(--mono);margin:0 0 24px}
+
+form{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;
+  border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:16px 0;margin-bottom:8px}
+.f{flex:1 1 150px;min-width:130px}
+.f.go{flex:0 0 auto}
+label{display:block;font:500 11px/1 var(--cond);letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:7px}
+select,input{width:100%;background:var(--panel);color:var(--text);border:1px solid var(--rule-hi);
+  border-radius:2px;padding:10px 11px;font:400 14px var(--mono)}
+select:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--mark);outline-offset:2px}
+button{background:var(--mark);color:#06141a;border:0;border-radius:2px;padding:12px 26px;
+  font:500 13px var(--cond);letter-spacing:.16em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+button:hover{background:#7BD8E2}
+button[disabled]{background:var(--rule-hi);color:var(--faint);cursor:default}
+.hint{color:var(--faint);font:400 12px/1.5 var(--sans);margin:0 0 26px}
+
+h2{font:500 12px/1 var(--cond);letter-spacing:.2em;text-transform:uppercase;color:var(--dim);
+  margin:38px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--rule)}
+
+.verdict{display:flex;gap:18px;align-items:baseline;flex-wrap:wrap;
+  border-left:3px solid var(--rule-hi);padding:16px 0 16px 18px;margin:4px 0 14px;background:var(--panel)}
+.verdict.green{border-left-color:var(--go)}
+.verdict.yellow{border-left-color:var(--marg)}
+.verdict.red{border-left-color:var(--stop)}
+.verdict .word{font:400 34px/1 var(--cond);letter-spacing:.03em}
+.verdict.green .word{color:var(--go)}
+.verdict.yellow .word{color:var(--marg)}
+.verdict.red .word{color:var(--stop)}
+.verdict .detail{color:var(--dim);font:400 13px/1.7 var(--mono)}
+
+.ribbon{background:var(--panel);border:1px solid var(--rule);border-radius:3px;overflow-x:auto}
+.ribbon-inner{min-width:660px}
+.ribbon svg{display:block;width:100%;height:66px}
+.cells{display:flex;border-top:1px solid var(--rule)}
+.cell{flex:1 1 0;padding:8px 1px 10px;text-align:center;border-right:1px solid var(--rule);
+  font:400 11px/1.5 var(--mono)}
+.cell:last-child{border-right:0}
+.cell .hr{color:var(--faint);font-size:10px}
+.cell .bar{height:4px;margin:5px 2px;border-radius:2px;background:var(--rule-hi)}
+.cell.green .bar{background:var(--go)}
+.cell.yellow .bar{background:var(--marg)}
+.cell.red .bar{background:var(--stop)}
+.cell.sel{background:var(--panel2)}
+.cell .wd{color:var(--dim);font-size:10px}
+.legend{display:flex;gap:18px;flex-wrap:wrap;color:var(--faint);font:400 12px var(--sans);margin:10px 0 0}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:baseline}
+
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font:400 13px var(--mono)}
+th{font:500 11px var(--cond);letter-spacing:.16em;text-transform:uppercase;color:var(--dim);
+  text-align:left;padding:0 10px 9px 0;font-weight:500;white-space:nowrap}
+td{padding:9px 10px 9px 0;border-top:1px solid var(--rule);vertical-align:top}
+td.name{font-family:var(--sans)}
+tr.pick td{cursor:pointer}
+tr.pick:hover td{background:var(--panel)}
+.b-green{color:var(--go)} .b-yellow{color:var(--marg)} .b-red{color:var(--stop)}
+.why{margin:4px 0 0;padding-left:16px;color:var(--marg);font:400 13px/1.6 var(--sans)}
+.why li{margin:2px 0}
+.why li.bad{color:var(--stop)}
+
+.note{background:var(--panel);border-left:3px solid var(--rule-hi);padding:12px 16px;
+  color:var(--dim);font:400 13px/1.6 var(--sans);margin:12px 0}
+.note.warn{border-left-color:var(--marg)}
+.note.err{border-left-color:var(--stop)}
+.note a{color:var(--mark)}
+.loading{color:var(--dim);font:400 13px var(--mono);padding:26px 0}
+
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--rule);
+  color:var(--faint);font:400 13px/1.75 var(--sans)}
+footer a{color:var(--mark)}
+@media (max-width:600px){
+  .f{flex:1 1 100%} .f.go{flex:1 1 100%} button{width:100%;padding:15px 26px}
+  select,input{font-size:16px;padding:13px 12px}   /* 16px stops iOS zooming on focus */
+  h1{font-size:32px}
+  td,th{padding-right:8px}
+  .verdict{gap:10px}
+  details.about summary{padding:6px 0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<p class="eyebrow">Small boat check</p>
+<h1 id="title">Southern Gulf Islands</h1>
+<p class="sub" id="subtitle">Tulista Park ramp, Sidney &nbsp;·&nbsp; Glastron SX170</p>
+
+<form id="controls" autocomplete="off">
+  <div class="f">
+    <label for="route">Where to</label>
+    <select id="route"></select>
+  </div>
+  <div class="f">
+    <label for="day">Day</label>
+    <input type="date" id="day">
+  </div>
+  <div class="f">
+    <label for="depart">Leave at</label>
+    <input type="time" id="depart" step="3600">
+  </div>
+  <div class="f">
+    <label for="ret">Back by</label>
+    <input type="time" id="ret" step="3600">
+  </div>
+  <div class="f go">
+    <label for="run">&nbsp;</label>
+    <button type="submit" id="run">Check</button>
+  </div>
+</form>
+<p class="hint">Leave the times blank to just see the best windows. Fill them in to test a plan of your own.</p>
+
+<div id="out"><p class="loading">Pick a destination and press Check.</p></div>
+
+
+<h2 style="margin-top:52px">How this works</h2>
+
+<details class="about"><summary>The wave calculation</summary><div class="body">
+<p>There is no wave buoy anywhere in these waters, so wave height is <strong>calculated</strong> from
+forecast wind and each leg's fetch using JONSWAP fetch-limited growth:</p>
+<pre>g·Hs/U² = 0.0016·√(g·F/U²)      g·Tp/U = 0.286·(g·F/U²)^⅓</pre>
+<p>Valid here because no ocean swell reaches inside Haro Strait — everything you meet is locally
+generated wind sea, which is exactly what this law describes.</p>
+<table>
+<tr><th>Wind</th><th>Fetch</th><th>Hs</th><th>Tp</th></tr>
+<tr><td>10 kn</td><td>2 km (sheltered)</td><td>0.12 m</td><td>1.4 s</td></tr>
+<tr><td>15 kn</td><td>20 km</td><td>0.56 m</td><td>3.3 s</td></tr>
+<tr><td>20 kn</td><td>35 km (Haro, SE)</td><td>0.98 m</td><td>4.4 s</td></tr>
+</table>
+<p><strong>By hand:</strong> <code>Hs ≈ wind(kn) × √fetch(km) / 120</code>. Since fetch is fixed per
+leg, that's one divisor each — Sidney Channel in a southeasterly is <code>wind ÷ 20</code>, Swanson
+<code>÷ 24</code>, Ganges approach <code>÷ 28</code>, Satellite <code>÷ 31</code>, Colburne
+<code>÷ 38</code>, Sidney Channel in a northwesterly <code>÷ 49</code>.</p>
+<p><strong>Seas need time to build.</strong> The formula gives the fully developed sea; reaching it
+takes 4–6 hours over Haro Strait fetch, about 2 in the sheltered passages. A southeasterly that came
+up an hour ago has made roughly a third of the table value.</p>
+</div></details>
+
+<details class="about"><summary>Wind against current, and why rips form</summary><div class="body">
+<p>On an opposing current a wave shortens and steepens:</p>
+<pre>c/c0 = ½(1 + √(1 + 4U/c0))
+H/H0 = 2 / [(1 + √(1+4U/c0))·(1+4U/c0)^¼]      c0 = 1.56·T</pre>
+<p>That height ratio diverges at <strong>U = −c0/4</strong> — the blocking limit, where the wave
+cannot propagate and breaks. That is what a tide rip is.</p>
+<table>
+<tr><th>Chop period</th><th>Blocked by</th></tr>
+<tr><td>2.5 s</td><td>1.9 kn</td></tr><tr><td>3.0 s</td><td>2.3 kn</td></tr>
+<tr><td>4.0 s</td><td>3.0 kn</td></tr><tr><td>5.0 s</td><td>3.8 kn</td></tr>
+</table>
+<p>Sidney Channel in a SE 16 kn, across the tide:</p>
+<table>
+<tr><th>Tide</th><th>Hs</th><th>Tp</th><th>Steepness</th></tr>
+<tr><td>Slack</td><td>0.79 m</td><td>4.1 s</td><td>0.030</td></tr>
+<tr><td>Flood 2.2 kn (with)</td><td>0.79 m</td><td>4.1 s</td><td>0.030</td></tr>
+<tr><td>Ebb 2.2 kn (against)</td><td>1.40 m</td><td>3.2 s</td><td>0.090</td></tr>
+<tr><td>Ebb 3.0 kn (against)</td><td>0.92 m</td><td>2.5 s</td><td>0.100 — blocked</td></tr>
+</table>
+<p>Same wind, same water, 77% more wave height depending only on tidal phase. In the last row the
+<strong>height falls</strong> because the sea has broken down into short steep chop. That is worse,
+not better, and the page says so rather than letting a smaller number read as improvement.</p>
+</div></details>
+
+<details class="about"><summary>Tuning it to your boat</summary><div class="body">
+<p>Everything lives in the <code>&lt;script&gt;</code> block at the top of this file. No build step,
+no dependencies — edit and commit.</p>
+<ul>
+<li><strong>fetch</strong> (inside each leg) — the biggest lever. Open-water km to the nearest upwind
+land, per sector, for the direction wind blows <em>from</em>. These are chart estimates; if a leg
+reads wrong, fix these first.</li>
+<li><strong>LIMITS</strong> — the green/yellow/red bands. Start conservative, loosen slowly.</li>
+<li><strong>BOAT.cruiseChop</strong> — used for transit and fuel once Hs exceeds
+<code>chopThreshold</code>. Budgeting the slow number stops you pushing a marginal call because
+you're running late.</li>
+<li><strong>floodSet</strong> — true bearing the flood sets on that leg; drives the
+wind-against-current test.</li>
+<li><strong>peakKn</strong> — scales the derived current.</li>
+</ul>
+<p>Keep a log. After each trip note what the page said and how the boat felt. A season of that beats
+any default here.</p>
+</div></details>
+
+<details class="about"><summary>If tides won't load</summary><div class="body">
+<p>The page asks the Canadian Hydrographic Service for tides directly. Some browsers block that
+(CHS doesn't send the header that permits it). If you see the "tides unavailable" warning
+every time, add two files to this repo and GitHub will fetch the data for you nightly.</p>
+<p><strong>1.</strong> <code>scripts/fetch_tides.py</code> — a short script that pulls 8 days of
+predictions for Sidney and Active Pass and writes <code>data/tides.json</code>. The page picks that
+file up automatically.</p>
+<p><strong>2.</strong> <code>.github/workflows/update.yml</code>:</p>
+<pre>name: Refresh tides
+on:
+  schedule: [{ cron: "20 11 * * *" }]
+  workflow_dispatch:
+permissions: { contents: write }
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/fetch_tides.py
+      - run: |
+          git config user.name github-actions
+          git config user.email actions@github.com
+          git add data/tides.json
+          git diff --staged --quiet || (git commit -m "tides" &amp;&amp; git push)</pre>
+<p>Then set <em>Settings → Actions → General → Workflow permissions</em> to <strong>Read and
+write</strong>. Until you do, wind and waves still work — you just lose currents and slack.</p>
+</div></details>
+
+<details class="about"><summary>Limits worth knowing</summary><div class="body">
+<ul>
+<li>Currents are derived from the rate of change of the tide curve, not published current tables.
+Slack <strong>timing</strong> is about right; the <strong>rate</strong> is indicative. For a narrow
+pass — Active Pass, Porlier, Pender Canal — use the official tables.</li>
+<li>Beyond about 48 hours the wind model falls back from HRDPS to a coarser global one that doesn't
+resolve funnelling between the islands. The page tells you which it used.</li>
+<li>Wave heights are calculated, not measured. A model of a model.</li>
+<li>Nothing here knows about fog, and fog is what most often catches an open boat with no radar on
+an August morning. Read the visibility line in the official forecast.</li>
+</ul>
+</div></details>
+
+<footer>
+  Wave heights are <strong>calculated</strong> from forecast wind and per-leg fetch — there is no
+  wave buoy in these waters. Wind comes from Open-Meteo, pinned to Environment Canada's HRDPS model
+  where it reaches. Tides come from the Canadian Hydrographic Service.<br><br>
+  This does not replace the official forecast. Read the
+  <a href="https://weather.gc.ca/marine/forecast_e.html?mapID=02&amp;siteID=06100" target="_blank" rel="noopener">Haro Strait marine forecast</a>
+  and check the
+  <a href="https://weather.gc.ca/marine/weatherConditions-regionalSummary_e.html?mapID=03&amp;siteID=06100&amp;stationID=WZO" target="_blank" rel="noopener">live station observations</a>
+  every time. File a float plan. Monitor VHF 16.
+</footer>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ config
+   Fetch is open-water distance in km to the nearest upwind land, per compass
+   sector, for the direction the wind is blowing FROM. These are chart
+   estimates — tune them as you learn the water. */
+
+const G = 9.80665, KN = 1.943844;
+const SECTORS = ["N","NE","E","SE","S","SW","W","NW"];
+
+const BOAT = {
+  name: "Glastron SX170",
+  cruiseCalm: 28, cruiseChop: 15, chopThreshold: 0.35,
+  burnCalm: 26, burnChop: 20, tank: 106
+};
+
+const LIMITS = {
+  green:  { hs: 0.40, gust: 15 },
+  yellow: { hs: 0.70, gust: 20 }
+};
+
+const WAC = { oppositionDeg: 120, minCurrentKn: 1.0,
+              breakingSteepness: 0.10,   // Hs/wavelength at which a sea breaks
+              dangerousSteepness: 0.055, // above this, call the leg red
+              minDangerousHs: 0.30,      // below this, steep/blocked is just texture
+              maxAmplification: 2.5 };   // energy bound on wave-current focusing
+
+const HOME = { name: "Tulista Park ramp, Sidney", tideStation: "sidney" };
+
+/* Verification links. The tool is a model; these are the sources of truth.
+   OBS(code) opens a station's past-24-hours wind trace on weather.gc.ca. */
+const OBS = c => `https://weather.gc.ca/marine/weatherConditions-24hrObsHistory_e.html?mapID=03&siteID=06100&stationID=${c}`;
+const FCST = id => `https://weather.gc.ca/marine/forecast_e.html?mapID=02&siteID=${id}`;
+const TIDEPAGE = c => `https://www.tides.gc.ca/en/stations/${c}`;
+
+const LINKS = {
+  haro:      { u:FCST("06100"), t:"Haro Strait forecast", d:"Your primary zone. Read this every time." },
+  jdf:       { u:FCST("07003"), t:"Juan de Fuca — east entrance", d:"Upstream. A westerly building here arrives at you later." },
+  sog:       { u:FCST("14305"), t:"Strait of Georgia — south of Nanaimo", d:"For anything north or east of Saturna." },
+  summary:   { u:`https://weather.gc.ca/marine/weatherConditions-regionalSummary_e.html?mapID=03&siteID=06100&stationID=WZO`,
+               t:"All stations at once", d:"Every land station and buoy in one table. The fastest reality check." },
+  kelp:      { u:OBS("WZO"), t:"Kelp Reefs", d:"Mid Haro Strait — the single best proxy for your water." },
+  discovery: { u:OBS("WDR"), t:"Discovery Island", d:"South end of Haro. Matters most for D'Arcy." },
+  yyj:       { u:OBS("YYJ"), t:"Victoria Int'l Airport", d:"Three km from the ramp. Check before you hitch up." },
+  saturna:   { u:OBS("WEZ"), t:"Saturna Island (East Point)", d:"What Boundary Pass and the north end are doing." },
+  racerocks: { u:OBS("WQK"), t:"Race Rocks", d:"Early warning for a Juan de Fuca westerly." },
+  esquimalt: { u:OBS("WPF"), t:"Esquimalt Harbour", d:"Secondary south-end reference." },
+  tideSidney:{ u:TIDEPAGE("07120"), t:"Sidney tide predictions", d:"Official heights. Use for beaching and the spit." },
+  tideActive:{ u:TIDEPAGE("07527"), t:"Active Pass currents", d:"Official current tables — the reference station for these passes." },
+  tideBedwell:{u:TIDEPAGE("07340"), t:"Bedwell Harbour tides", d:"Official heights for the canal and the anchorage." },
+  tideGanges:{ u:TIDEPAGE("07330"), t:"Ganges Harbour tides", d:"Official heights for the harbour." },
+  tables:    { u:"https://charts.gc.ca/publications/tables-eng.html",
+               t:"Tide & Current Tables, Volume 5", d:"Free PDF. Worth carrying on paper." }
+};
+
+const ROUTES = {
+  sidney_island: { label: "Sidney Island (Sidney Spit)", nm: 3.2, legs: [
+    { name:"Sidney Channel crossing", lat:48.6520, lon:-123.3620,
+      cur:"sidney", floodSet:340, peakKn:2.5, offsetMin:0,
+      fetch:{N:5,NE:8,E:12,SE:35,S:30,SW:3,W:2,NW:6},
+      note:"Open to the southeast down Haro Strait. The spit dries a long way northwest — give it room." }
+  ], cheat:{
+      rule:"Kelp Reefs wind ÷ 20 if from the SE. ÷ 50 if from the NW.",
+      bad:"Southeast",
+      watch:[
+        "SE wind is the whole game here. Same speed from the NW is barely half the wave.",
+        "Ebb tide + SE wind = much worse. Knock yourself down a category.",
+        "The spit runs a long way northwest and dries. Don't cut the corner.",
+        "Only 3 nm — you can turn around. Go look, and come back if you don't like it."
+      ],
+      bail:"Portland Island instead — sheltered the whole way." },
+     links:["haro","summary","kelp","yyj","discovery","tideSidney"]},
+  darcy_island: { label: "D'Arcy Island", nm: 7.0, legs: [
+    { name:"Sidney Channel crossing", lat:48.6520, lon:-123.3620,
+      cur:"sidney", floodSet:340, peakKn:2.5, offsetMin:0,
+      fetch:{N:5,NE:8,E:12,SE:35,S:30,SW:3,W:2,NW:6} },
+    { name:"Haro Strait, off D'Arcy", lat:48.5800, lon:-123.2800,
+      cur:"sidney", floodSet:350, peakKn:3.0, offsetMin:0,
+      fetch:{N:10,NE:12,E:15,SE:40,S:35,SW:10,W:8,NW:12},
+      note:"Genuinely open water. Treat this a full band tighter than Sidney Spit." }
+  ], cheat:{
+      rule:"Kelp Reefs wind ÷ 18 if from the SE. ÷ 45 if from the NW.",
+      bad:"Southeast, and anything from the south",
+      watch:[
+        "This is real open water — a full step tighter than Sidney Spit.",
+        "Check Race Rocks too. A westerly building there is heading your way.",
+        "You're 7 nm out with no shelter in between. Committing further than it looks.",
+        "If it's marginal at Sidney Spit, it's a no at D'Arcy."
+      ],
+      bail:"Stop at Sidney Spit and don't carry on south." },
+     links:["haro","jdf","summary","kelp","discovery","racerocks","yyj","tideSidney"]},
+  portland_island: { label: "Portland Island (Princess Margaret)", nm: 6.5, legs: [
+    { name:"Colburne & Moresby passages", lat:48.6900, lon:-123.3800,
+      cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
+      fetch:{N:4,NE:5,E:6,SE:6,S:4,SW:3,W:3,NW:10},
+      note:"Your bad-weather substitute — behind land nearly the whole way. Ferry wash is the main nuisance." }
+  ], cheat:{
+      rule:"Any direction ÷ 38. Hard to get in trouble here.",
+      bad:"Not much — it's sheltered from every direction",
+      watch:[
+        "This is your bad-day option. When the others are marginal, come here.",
+        "Ferry wash from Swartz Bay rolls into Royal Cove. Watch your dinghy and your anchor.",
+        "Current runs 2–3 kn through the passages — noticeable, not a problem at your speed."
+      ],
+      bail:"None needed. This is the bail-out." },
+     links:["haro","summary","yyj","kelp","tideSidney"]},
+  pender: { label: "Pender Island (Bedwell / Port Browning)", nm: 13.0, legs: [
+    { name:"Moresby Passage", lat:48.7000, lon:-123.3600,
+      cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
+      fetch:{N:6,NE:6,E:8,SE:10,S:6,SW:4,W:4,NW:8} },
+    { name:"Swanson Channel crossing", lat:48.7500, lon:-123.3200,
+      cur:"activepass", floodSet:310, peakKn:3.5, offsetMin:-35,
+      fetch:{N:8,NE:10,E:12,SE:25,S:20,SW:15,W:6,NW:12},
+      note:"Active ferry route — cross square to it and get across promptly." },
+    { name:"Bedwell Harbour approach", lat:48.7450, lon:-123.2400,
+      cur:"activepass", floodSet:300, peakKn:2.0, offsetMin:-35,
+      fetch:{N:5,NE:6,E:8,SE:20,S:12,SW:10,W:5,NW:6} }
+  ], cheat:{
+      rule:"Kelp Reefs wind ÷ 24 if from the SE. ÷ 40 if from the NW.",
+      bad:"Southeast",
+      watch:[
+        "Swanson Channel is the crossing that counts — and it's an active ferry route. Cross square to it and get across.",
+        "13 nm each way. At chop speed that's nearly an hour home. Don't leave it late.",
+        "Check Saturna as well as Kelp Reefs — it tells you what the north end is doing.",
+        "For the canal: go near high water. Depth is what stops you, not the bridge."
+      ],
+      bail:"Portland Island, or anchor in Bedwell and wait out the afternoon." },
+     links:["haro","sog","summary","kelp","saturna","yyj","tideActive","tideBedwell","tables"],
+     canal:{ name:"Pender Canal", tide:"bedwell",
+       floodTowards:"north into Port Browning", ebbTowards:"south into Bedwell Harbour",
+       lowTideCautionM:1.5 },
+     hazards:[
+    "Pender Canal is narrow and shallow with a low fixed bridge. Your boat has no air draft problem — depth and current are what matter. The alternative is the long way round via Plumper Sound."
+  ]},
+  ganges: { label: "Ganges Marina, Salt Spring", nm: 19.0, legs: [
+    { name:"Colburne & Moresby passages", lat:48.6900, lon:-123.3800,
+      cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
+      fetch:{N:4,NE:5,E:6,SE:6,S:4,SW:3,W:3,NW:10} },
+    { name:"Satellite Channel", lat:48.7200, lon:-123.4500,
+      cur:"sidney", floodSet:100, peakKn:2.0, offsetMin:0,
+      fetch:{N:5,NE:6,E:8,SE:8,S:5,SW:8,W:15,NW:14},
+      note:"Afternoon westerly funnels out of Saanich Inlet and Sansum Narrows. The zone forecast underplays this." },
+    { name:"Captain Passage & Ganges approach", lat:48.8300, lon:-123.4500,
+      cur:"activepass", floodSet:320, peakKn:2.0, offsetMin:-50,
+      fetch:{N:6,NE:8,E:10,SE:18,S:10,SW:6,W:5,NW:15},
+      note:"The harbour opens southeast and the approach has reefs. A southeasterly is the bad one here." }
+  ], cheat:{
+      rule:"Kelp Reefs wind ÷ 28 if from the SE. Satellite Channel: westerly ÷ 31.",
+      bad:"Southeast into Ganges, westerly in Satellite Channel",
+      watch:[
+        "Longest run you do — 19 nm each way, 38 round trip. Fuel with real reserve.",
+        "Satellite Channel gets an afternoon westerly funnelling out of Saanich Inlet that the zone forecast underplays.",
+        "Ganges Harbour opens southeast and the approach has reefs. A SE blow makes the last mile unpleasant.",
+        "Early start, firm turnaround time, or plan to stay the night."
+      ],
+      bail:"Turn into Portland Island or Montague and wait, rather than pushing home late." },
+     links:["haro","sog","summary","yyj","kelp","saturna","tideGanges","tideActive"],
+     hazards:[
+    "38 nm round trip. At a 15 kn chop cruise that is about 80 minutes each way — plan fuel with real reserve."
+  ]}
+};
+
+/* --------------------------------------------------------------- physics */
+
+const sectorFor = deg => SECTORS[Math.round(((deg%360)+360)%360/45)%8];
+const PTS16 = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+const point16 = deg => PTS16[Math.round(((deg%360)+360)%360/22.5)%16];
+const angGap = (a,b) => Math.abs(((a-b+180)%360+360)%360-180);
+
+function fetchMetres(leg, windFrom){
+  const idx = (((windFrom%360)+360)%360)/45;
+  const lo = Math.floor(idx)%8, hi = Math.ceil(idx)%8, f = idx-Math.floor(idx);
+  const km = leg.fetch[SECTORS[lo]]*(1-f) + leg.fetch[SECTORS[hi]]*f;
+  return Math.max(km,0.3)*1000;
+}
+
+/* JONSWAP fetch-limited growth.
+   gHs/U^2 = 0.0016*sqrt(gF/U^2)   ;   gTp/U = 0.286*(gF/U^2)^(1/3) */
+function fetchLimitedSea(windKn, fetchM){
+  const u = Math.max(windKn,0.1)/KN;
+  const nd = G*fetchM/(u*u);
+  return { hs: 0.0016*Math.sqrt(nd)*u*u/G,
+           tp: 0.286*Math.cbrt(nd)*u/G,
+           buildHours: 68.8*(u/G)*Math.pow(nd,2/3)/3600 };
+}
+
+/* Deep-water wave-current interaction.
+   c/c0 = 0.5(1+sqrt(1+4U/c0)),  H/H0 = 2/[(1+sqrt(1+4U/c0))(1+4U/c0)^0.25]
+   Diverges at U = -c0/4: the blocking limit, i.e. a tide rip. */
+function currentSteepening(hs, tp, opposingKn){
+  const c0 = 1.56*tp, l0 = 1.56*tp*tp;
+  if (opposingKn < WAC.minCurrentKn || tp <= 0)
+    return { hs, tp, length:l0, steep: hs/l0, blocked:false };
+  const u = -Math.abs(opposingKn)/KN;
+  const r = 1 + 4*u/c0;
+
+  // As the current approaches the blocking speed, celerity falls toward c0/2
+  // and wavelength toward l0/4. Past that point the wave cannot propagate at
+  // all and simply breaks, so conditions stop changing — clamp there rather
+  // than letting the formula diverge.
+  const rr = Math.max(r, 0);
+  const c = 0.5*(1+Math.sqrt(rr))*c0;
+  const length = Math.max(l0*Math.pow(c/c0,2), l0/4);
+
+  // Two ceilings: waves break above a limiting steepness, and they cannot
+  // carry more energy than arrives, so focusing is bounded too.
+  const maxHs = Math.min(WAC.breakingSteepness*length, hs*WAC.maxAmplification);
+
+  if (r <= 0) return { hs:maxHs, tp: c>0?length/c:tp, length,
+                       steep: maxHs/length, blocked:true };
+
+  const nHs = hs*2/((1+Math.sqrt(r))*Math.pow(r,0.25));
+  const blocked = nHs >= maxHs;
+  const finalHs = Math.min(nHs, maxHs);
+  return { hs:finalHs, tp: c>0?length/c:tp, length, steep: finalHs/length, blocked };
+}
+
+function bandFor(hs, gust){
+  if (hs <= LIMITS.green.hs  && gust <= LIMITS.green.gust)  return "green";
+  if (hs <= LIMITS.yellow.hs && gust <= LIMITS.yellow.gust) return "yellow";
+  return "red";
+}
+const worseOf = (a,b) => ({green:0,yellow:1,red:2}[a] >= {green:0,yellow:1,red:2}[b] ? a : b);
+
+/* ------------------------------------------------------------------ data */
+
+let TIDES = null, TIDE_ERR = null, TIDE_SRC = null;
+
+const IWLS = "https://api-iwls.dfo-mpo.gc.ca/api/v1";
+const STATION_KEYS = {           // key -> [name fragments, approx lat, lon]
+  sidney:     [["sidney"],      48.65, -123.39],
+  activepass: [["active pass"], 48.87, -123.30],
+  bedwell:    [["bedwell"],     48.75, -123.23]
+};
+
+/* The CHS station index is ~2 MB and never changes, so it's cached locally for
+   a month. (This is a real web page on your own domain, so localStorage works
+   normally here.) */
+async function stationIndex(){
+  try{
+    const c = JSON.parse(localStorage.getItem("chs_stations") || "null");
+    if(c && Date.now() - c.at < 30*864e5) return c.list;
+  }catch(e){}
+  const r = await fetch(`${IWLS}/stations`);
+  if(!r.ok) throw new Error("CHS station index: HTTP "+r.status);
+  const list = (await r.json())
+    .filter(st => st.latitude > 47.5 && st.latitude < 50.5 &&
+                  st.longitude > -125.5 && st.longitude < -122.5)
+    .map(st => ({ code:st.code, id:st.id, name:st.officialName,
+                  lat:st.latitude, lon:st.longitude,
+                  series:(st.timeSeries||[]).map(t=>t.code) }));
+  try{ localStorage.setItem("chs_stations", JSON.stringify({at:Date.now(), list})); }catch(e){}
+  return list;
+}
+
+function matchStation(list, frags, lat, lon){
+  const hits = list.filter(st =>
+    frags.some(f => (st.name||"").toLowerCase().includes(f)) && st.series.includes("wlp"));
+  if(!hits.length) return null;
+  return hits.sort((a,b) =>
+    ((a.lat-lat)**2+(a.lon-lon)**2) - ((b.lat-lat)**2+(b.lon-lon)**2))[0];
+}
+
+async function stationSeries(st, fromISO, toISO){
+  const p = new URLSearchParams({
+    "time-series-code":"wlp", from:fromISO, to:toISO, resolution:"FIFTEEN_MINUTES" });
+  const r = await fetch(`${IWLS}/stations/${st.id}/data?${p}`);
+  if(!r.ok) throw new Error(`CHS data for ${st.name}: HTTP ${r.status}`);
+  return (await r.json()).map(pt => [pt.eventDate, +(+pt.value).toFixed(3)]);
+}
+
+/* Try CHS directly. If the browser blocks it (CORS) or it's down, fall back to
+   a data/tides.json file if one has been committed, and otherwise carry on
+   with wind and waves only. */
+async function loadTides(dayISO){
+  const from = new Date(dayISO+"T00:00:00"); from.setHours(from.getHours()-6);
+  const to   = new Date(dayISO+"T00:00:00"); to.setHours(to.getHours()+30);
+  const iso = d => d.toISOString().slice(0,19)+"Z";
+
+  try{
+    const list = await stationIndex();
+    const out = { stations:{}, meta:{} };
+    for(const [key,[frags,lat,lon]] of Object.entries(STATION_KEYS)){
+      const st = matchStation(list, frags, lat, lon);
+      if(!st) continue;
+      out.stations[key] = await stationSeries(st, iso(from), iso(to));
+      out.meta[key] = st;
+    }
+    if(Object.keys(out.stations).length){
+      TIDES = out; TIDE_ERR = null; TIDE_SRC = "live from CHS";
+      return;
+    }
+    throw new Error("no matching stations");
+  }catch(e){
+    try{
+      const r = await fetch("data/tides.json", {cache:"no-store"});
+      if(r.ok){
+        const j = await r.json();
+        if(j.stations && Object.keys(j.stations).length){
+          TIDES = j; TIDE_ERR = null;
+          TIDE_SRC = "from data/tides.json"; return;
+        }
+      }
+    }catch(e2){}
+    TIDES = null; TIDE_ERR = e.message;
+  }
+}
+
+/* Open-Meteo accepts comma-separated coordinates and returns one block per
+   location, so every leg comes back in a single request. */
+async function loadWind(legs, dayISO){
+  const days = Math.round((new Date(dayISO+"T12:00") - new Date(new Date().toDateString()))/864e5);
+  const model = days <= 2 ? "gem_hrdps_continental" : "best_match";
+  const p = new URLSearchParams({
+    latitude:  legs.map(l=>l.lat).join(","),
+    longitude: legs.map(l=>l.lon).join(","),
+    hourly: "wind_speed_10m,wind_gusts_10m,wind_direction_10m,visibility,precipitation,temperature_2m",
+    wind_speed_unit: "kn", timezone: "America/Vancouver",
+    models: model, start_date: dayISO, end_date: dayISO
+  });
+  const r = await fetch("https://api.open-meteo.com/v1/forecast?"+p);
+  if(!r.ok) throw new Error("Weather service returned "+r.status);
+  let j = await r.json();
+  if(!Array.isArray(j)) j = [j];
+  return { model, blocks: j.map(b => {
+    const m = {};
+    b.hourly.time.forEach((t,i)=>{ m[t.slice(11,16)] = {
+      wind: b.hourly.wind_speed_10m[i], gust: b.hourly.wind_gusts_10m[i],
+      from: b.hourly.wind_direction_10m[i], vis: b.hourly.visibility?.[i],
+      precip: b.hourly.precipitation[i], temp: b.hourly.temperature_2m[i] };});
+    return m;
+  })};
+}
+
+/* Current in knots, signed: + flooding, - ebbing. Derived from the rate of
+   change of the tide curve and scaled to the leg's known peak rate. Gets slack
+   TIMING about right; the rate is indicative only. */
+function currentSeries(stationKey, dayISO, peakKn, offsetMin){
+  const raw = TIDES?.stations?.[stationKey];
+  if(!raw) return null;
+  const pts = raw.map(([t,v]) => [new Date(t).getTime(), v])
+                 .sort((a,b)=>a[0]-b[0]);
+  const d0 = new Date(dayISO+"T00:00:00").getTime() - 36e5;
+  const d1 = d0 + 26*36e5;
+  const win = pts.filter(p => p[0]>=d0 && p[0]<=d1);
+  if(win.length < 3) return null;
+  const der = [];
+  for(let i=1;i<win.length-1;i++){
+    const dtH = (win[i+1][0]-win[i-1][0])/36e5;
+    der.push([win[i][0] + offsetMin*6e4, (win[i+1][1]-win[i-1][1])/dtH]);
+  }
+  const scale = Math.max(...der.map(d=>Math.abs(d[1]))) || 1;
+  return der.map(([t,v]) => [t, v/scale*peakKn]);
+}
+
+function interp(series, ms){
+  if(!series || !series.length) return 0;
+  if(ms <= series[0][0]) return series[0][1];
+  if(ms >= series[series.length-1][0]) return series[series.length-1][1];
+  for(let i=0;i<series.length-1;i++){
+    const [t0,v0]=series[i], [t1,v1]=series[i+1];
+    if(ms>=t0 && ms<=t1) return v0+(v1-v0)*(ms-t0)/((t1-t0)||1);
+  }
+  return series[series.length-1][1];
+}
+
+function slackTimes(series){
+  if(!series) return [];
+  const out=[];
+  for(let i=0;i<series.length-1;i++){
+    const [t0,v0]=series[i], [t1,v1]=series[i+1];
+    if(v0===0 && v1===0) continue;
+    if((v0<0)===(v1<0) && v0!==0) continue;
+    const f = (Math.abs(v0)+Math.abs(v1)) ? Math.abs(v0)/(Math.abs(v0)+Math.abs(v1)) : 0;
+    const when = t0+(t1-t0)*f;
+    if(out.length && Math.abs(when-out[out.length-1][0]) < 9e5) continue;
+    out.push([when, v1>0 ? "before flood" : "before ebb"]);
+  }
+  return out;
+}
+
+/* ---------------------------------------------------------------- engine */
+
+function evaluate(routeKey, dayISO, windData, currents){
+  const route = ROUTES[routeKey];
+  const hours = [];
+  for(let h=5; h<=21; h++){
+    const hh = String(h).padStart(2,"0")+":00";
+    const ms = new Date(`${dayISO}T${hh}:00`).getTime();
+    const legs = [];
+    route.legs.forEach((leg,i) => {
+      const w = windData.blocks[i]?.[hh];
+      if(!w) return;
+      const sea = fetchLimitedSea(w.wind, fetchMetres(leg, w.from));
+      let hs = sea.hs, tp = sea.tp;
+      let steep = hs/(1.56*tp*tp), blocked = false, length = 1.56*tp*tp;
+
+      const cur = interp(currents[i], ms);
+      const setDeg = cur >= 0 ? leg.floodSet : (leg.floodSet+180)%360;
+      const waveDir = (w.from+180)%360;
+      const opposed = currents[i] &&
+        angGap(waveDir, setDeg) >= WAC.oppositionDeg &&
+        Math.abs(cur) >= WAC.minCurrentKn;
+
+      const reasons = [];
+      if(opposed){
+        const before = hs;
+        const r = currentSteepening(hs, tp, Math.abs(cur));
+        hs=r.hs; tp=r.tp; steep=r.steep; blocked=r.blocked; length=r.length;
+        if(blocked && hs < WAC.minDangerousHs){
+          reasons.push({t:`Wind against ${Math.abs(cur).toFixed(1)} kn of current, but only ${hs.toFixed(2)} m of sea — choppy texture, not a hazard.`});
+        } else reasons.push(blocked
+          ? {bad:true, t:`Wind against ${Math.abs(cur).toFixed(1)} kn of current, at or past the blocking limit — a standing, breaking rip. `
+              + (hs < before
+                 ? `The height shown (${hs.toFixed(2)} m) is LOWER than the ${before.toFixed(2)} m open-water sea because the waves have broken down into short steep chop only ${length.toFixed(0)} m apart. That is worse, not better.`
+                 : `Waves ${length.toFixed(0)} m apart with near-vertical breaking faces.`)}
+          : {t:`Wind against ${Math.abs(cur).toFixed(1)} kn of current — seas steepen from ${before.toFixed(2)} m to ${hs.toFixed(2)} m, wavelength down to ${length.toFixed(0)} m.`});
+      }
+
+      let band = bandFor(hs, w.gust);
+      // Blocking and steepness only matter once there is real height behind
+      // them. A blocked 0.15 m ripple is texture on the water, not a hazard.
+      const material = hs >= WAC.minDangerousHs;
+      if(material && (blocked || steep >= WAC.dangerousSteepness)){
+        band = "red";
+        if(!blocked) reasons.push({bad:true, t:`Steepness ${steep.toFixed(3)} — breaking crests with near-vertical faces.`});
+      }
+      if(w.gust > LIMITS.yellow.gust) reasons.push({t:`Gusts to ${Math.round(w.gust)} kn.`});
+      if(w.vis != null && w.vis < 2000){ band="red"; reasons.push({bad:true, t:`Visibility ${(w.vis/1000).toFixed(1)} km — you have no radar.`}); }
+      if(tp < 3 && hs > 0.35) reasons.push({t:`Short ${tp.toFixed(1)} s period — steep, close-spaced chop.`});
+      if(sea.buildHours > 3 && w.wind >= 12) reasons.push({t:`These seas need about ${sea.buildHours.toFixed(1)} h of steady wind to fully build — less if it just came up.`});
+
+      legs.push({name:leg.name, note:leg.note, wind:w.wind, gust:w.gust, from:w.from,
+                 hs, tp, steep, blocked, cur, opposed, band, reasons});
+    });
+    if(legs.length) hours.push({hh, ms, legs, band: legs.map(l=>l.band).reduce(worseOf,"green")});
+  }
+  return {route, hours};
+}
+
+const transitMin = (route, hs) =>
+  Math.round(route.nm / (hs > BOAT.chopThreshold ? BOAT.cruiseChop : BOAT.cruiseCalm) * 60);
+
+function evaluateWindow(ev, depHH, retHH){
+  const out = ev.hours.find(h=>h.hh===depHH), back = ev.hours.find(h=>h.hh===retHH);
+  if(!out || !back) return null;
+  const hsOut = Math.max(...out.legs.map(l=>l.hs));
+  const hsBack = Math.max(...back.legs.map(l=>l.hs));
+  const tOut = transitMin(ev.route, hsOut), tBack = transitMin(ev.route, hsBack);
+  const burn = Math.max(hsOut,hsBack) > BOAT.chopThreshold ? BOAT.burnChop : BOAT.burnCalm;
+  const fuel = Math.round((tOut+tBack)/60*burn);
+  const span = ev.hours.filter(h => h.hh>=depHH && h.hh<=retHH);
+  const worst = span.map(h=>h.band).reduce(worseOf,"green");
+  const turns = span.find(h=>h.band==="red");
+  const reasons = [...out.legs, ...back.legs].flatMap(l => l.reasons.map(r=>({...r, leg:l.name})));
+  return {depHH, retHH, verdict:worst, tOut, tBack, fuel,
+          fuelPct: Math.round(100*fuel/BOAT.tank),
+          turnsBadAt: turns && turns.hh !== depHH ? turns.hh : null, span, reasons};
+}
+
+function bestWindows(ev, minAshore=2, top=4){
+  const rank = {green:0,yellow:1,red:2};
+  const cand = [];
+  for(let i=0;i<ev.hours.length;i++)
+    for(let j=i+1;j<ev.hours.length;j++){
+      const ashore = (ev.hours[j].ms - ev.hours[i].ms)/36e5;
+      if(ashore < minAshore) continue;
+      const w = evaluateWindow(ev, ev.hours[i].hh, ev.hours[j].hh);
+      if(!w) continue;
+      w.penalty = w.span.reduce((s,h)=>s+rank[h.band],0);
+      w.ashore = ashore;
+      cand.push(w);
+    }
+  cand.sort((a,b)=> rank[a.verdict]-rank[b.verdict] || a.penalty-b.penalty || b.ashore-a.ashore);
+  return cand.slice(0,top);
+}
+
+/* -------------------------------------------------------------- rendering */
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pretty = hh => { const h=+hh.slice(0,2); return `${((h+11)%12)+1}${h<12?" am":" pm"}`; };
+const WORD = {green:"Go", yellow:"Marginal", red:"Don't"};
+
+function renderRibbon(ev, sel){
+  const tide = TIDES?.stations?.[HOME.tideStation];
+  let svg = "";
+  const W = ev.hours.length*40;
+  if(tide){
+    const t0 = ev.hours[0].ms, t1 = ev.hours[ev.hours.length-1].ms;
+    const pts = tide.map(([t,v])=>[new Date(t).getTime(),v]).filter(p=>p[0]>=t0&&p[0]<=t1);
+    if(pts.length>2){
+      const vs = pts.map(p=>p[1]), lo=Math.min(...vs), hi=Math.max(...vs), sp=(hi-lo)||1;
+      const poly = pts.map(([t,v]) => `${((t-t0)/(t1-t0)*W).toFixed(1)},${(60-(v-lo)/sp*52).toFixed(1)}`).join(" ");
+      const sl = slackTimes(currentSeries(ev.route.legs[0].cur, ev.hours[0].hh && new Date(t0).toISOString().slice(0,10), ev.route.legs[0].peakKn, ev.route.legs[0].offsetMin) || []);
+      const marks = sl.filter(s=>s[0]>=t0&&s[0]<=t1)
+        .map(s=>`<line x1="${((s[0]-t0)/(t1-t0)*W).toFixed(1)}" y1="0" x2="${((s[0]-t0)/(t1-t0)*W).toFixed(1)}" y2="66" stroke="#5BC8D4" stroke-width="1" stroke-dasharray="3 4"/>`).join("");
+      svg = `<svg viewBox="0 0 ${W} 66" preserveAspectRatio="none" role="img" aria-label="Tide height through the day, with slack water marked">
+        <polyline points="${poly}" fill="none" stroke="#2C4B59" stroke-width="1.5"/>${marks}</svg>`;
+    }
+  }
+  const cells = ev.hours.map(h => {
+    const w = h.legs.reduce((a,b)=>b.hs>a.hs?b:a);
+    const inSel = sel && h.hh>=sel[0] && h.hh<=sel[1];
+    return `<div class="cell ${h.band}${inSel?" sel":""}">
+      <div class="hr">${h.hh.slice(0,2)}</div><div class="bar"></div>
+      <div>${w.hs.toFixed(2)}</div>
+      <div class="wd">${sectorFor(w.from)}${Math.round(w.wind)}</div></div>`;
+  }).join("");
+  return `<div class="ribbon"><div class="ribbon-inner">${svg}<div class="cells">${cells}</div></div></div>
+  <div class="legend">
+    <span><i style="background:#4FB286"></i>Go</span>
+    <span><i style="background:#E0A33E"></i>Marginal</span>
+    <span><i style="background:#D8563F"></i>Don't</span>
+    <span><i style="background:#2C4B59"></i>Tide curve</span>
+    <span><i style="background:#5BC8D4"></i>Slack water</span>
+    <span>Numbers are wave height (m) and wind (kn) on the worst leg.</span></div>`;
+}
+
+function renderLegs(hour){
+  if(!hour) return "";
+  const rows = hour.legs.map(l => {
+    const why = l.reasons.length
+      ? `<tr><td colspan="5"><ul class="why">${l.reasons.map(r=>`<li class="${r.bad?"bad":""}">${esc(r.t)}</li>`).join("")}</ul></td></tr>` : "";
+    return `<tr><td class="name">${esc(l.name)}${l.note?`<div style="color:var(--faint);font-size:12px;margin-top:3px">${esc(l.note)}</div>`:""}</td>
+      <td>${sectorFor(l.from)} ${Math.round(l.wind)} g${Math.round(l.gust)}</td>
+      <td class="b-${l.band}">${l.hs.toFixed(2)} m @ ${l.tp.toFixed(1)} s</td>
+      <td>${Math.abs(l.cur).toFixed(1)} kn ${l.cur>=0?"flood":"ebb"}</td>
+      <td class="b-${l.band}">${l.blocked?"BLOCKED":(l.opposed?"opposed":"")}</td></tr>${why}`;
+  }).join("");
+  return `<div class="scroll"><table><tr><th>Leg</th><th>Wind</th><th>Sea</th><th>Current</th><th></th></tr>${rows}</table></div>`;
+}
+
+
+/* Pender Canal. The canal links Bedwell Harbour to Port Browning, and water is
+   pushed through it by the tide filling and draining. So the FLOW follows the
+   rate of change of the tide curve: rising tide = flooding through, falling =
+   ebbing. Slack is at high and low water, not partway between.
+
+   Direction is a configurable assumption (floodTowards / ebbTowards). If you
+   run it and the set is opposite to what's written, swap those two strings. */
+function renderCanal(route, dayISO){
+  const c = route.canal;
+  if(!c) return "";
+  const raw = TIDES?.stations?.[c.tide];
+  if(!raw) return `<h2>${esc(c.name)}</h2><div class="note warn">
+    No Bedwell Harbour tide data loaded, so there is no depth guidance here.
+    Check <a href="${LINKS.tideBedwell.u}" target="_blank" rel="noopener">the official tide page</a>
+    before committing to the canal.</div>`;
+
+  const pts = raw.map(([t,v]) => [new Date(t).getTime(), v]).sort((a,b)=>a[0]-b[0]);
+  const d0 = new Date(dayISO+"T00:00:00").getTime(), d1 = d0 + 864e5;
+  const day = pts.filter(p => p[0] >= d0-36e5 && p[0] <= d1+36e5);
+  if(day.length < 5) return "";
+
+  // High and low water: turning points of the height curve.
+  const turns = [];
+  for(let i=1;i<day.length-1;i++){
+    const [pv,v,nv] = [day[i-1][1], day[i][1], day[i+1][1]];
+    if((v>=pv && v>=nv && v>pv) || (v<=pv && v<=nv && v<pv)){
+      const kind = v >= pv ? "high" : "low";
+      if(turns.length && day[i][0]-turns[turns.length-1][0] < 36e5) continue;
+      if(day[i][0]>=d0 && day[i][0]<=d1) turns.push([day[i][0], kind, v]);
+    }
+  }
+
+  const rows = [];
+  for(let hr=5; hr<=21; hr++){
+    const ms = d0 + hr*36e5;
+    const near = day.reduce((a,b)=> Math.abs(b[0]-ms) < Math.abs(a[0]-ms) ? b : a);
+    const height = near[1];
+    const thin = height < c.lowTideCautionM;
+    rows.push(`<tr><td>${String(hr).padStart(2,"0")}:00</td>
+      <td class="${thin?"b-yellow":"b-green"}">${height.toFixed(1)} m</td>
+      <td style="font-family:var(--sans);color:var(--faint)">${thin?"thin — check your own sounding":""}</td></tr>`);
+  }
+
+  const hilo = turns.length
+    ? turns.map(t=>`<strong>${new Date(t[0]).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</strong> ${t[1]} (${t[2].toFixed(1)} m)`).join(" &nbsp;·&nbsp; ")
+    : "none in the window";
+
+  return `<h2>${esc(c.name)}</h2>
+
+  <div class="note"><strong>High and low water at Bedwell today:</strong><br>${hilo}
+    <br><br>Depth is the thing that will actually stop you. Your boat has no air-draft problem with
+    the bridge, so plan the transit around water over the shallow section — near high water,
+    and away from the bottom of the tide.</div>
+
+  <table><tr><th>Hour</th><th>Tide at Bedwell</th><th></th></tr>${rows.join("")}</table>
+
+  <div class="note warn"><strong>On which way it's pushing — I don't want to guess.</strong>
+    The canal joins Bedwell Harbour to Plumper Sound, so the flow is driven by the small difference
+    in tide height between the two ends, not by how fast Bedwell itself is filling. Those two
+    mechanisms put slack at opposite points in the cycle, and I can't resolve which applies here
+    from tide data alone. Rather than print a confident table that might be exactly backwards,
+    this section gives you depth only.
+    <br><br>For the set and timing, use
+    <a href="${LINKS.tables.u}" target="_blank" rel="noopener">Tide &amp; Current Tables Volume 5</a>
+    or local knowledge, and note what you see on your first few transits — direction, roughly what
+    time, and the state of the tide. A handful of those and you'll know the pattern cold, at which
+    point it can go in this file as something real rather than an assumption.
+    <br><br>The ${c.lowTideCautionM} m "thin" threshold is a placeholder until you've sounded it.</div>`;
+}
+
+function renderCheat(route, ev){
+  const c = route.cheat;
+  if(!c) return "";
+
+  /* Read today's wind-vs-tide on the most exposed leg — the one with the
+     biggest open water in any direction, which is what drives the verdict. */
+  let today = "";
+  const legIdx = route.legs.reduce((best,l,i,arr) =>
+    Math.max(...Object.values(l.fetch)) > Math.max(...Object.values(arr[best].fetch)) ? i : best, 0);
+  const legName = route.legs[legIdx].name;
+
+  const rows = ev.hours.filter(h => h.legs[legIdx]).map(h => {
+    const l = h.legs[legIdx];
+    const set = l.cur >= 0 ? route.legs[legIdx].floodSet : (route.legs[legIdx].floodSet+180)%360;
+    return { hh:h.hh, from:l.wind_from ?? l.from, wind:l.wind, cur:l.cur,
+             set, opposed:l.opposed, blocked:l.blocked, band:h.band };
+  });
+
+  if(rows.length){
+    /* Contiguous runs where wind fights the tide AND there's enough wind for it
+       to matter. Opposition in a 6 kn breeze is not worth flagging. Runs
+       separated by a single hour get merged — the gap is usually just the
+       current passing through slack, not conditions genuinely improving. */
+    const MIN_WIND = 10;
+    const runs = []; let cur = null;
+    rows.forEach(r => {
+      const problem = r.opposed && r.wind >= MIN_WIND;
+      if(problem){ if(!cur) cur = {a:r.hh,b:r.hh}; else cur.b = r.hh; }
+      else if(cur){ runs.push(cur); cur = null; }
+    });
+    if(cur) runs.push(cur);
+    for(let i=runs.length-1;i>0;i--){
+      if(+runs[i].a.slice(0,2) - +runs[i-1].b.slice(0,2) <= 2){
+        runs[i-1].b = runs[i].b; runs.splice(i,1);
+      }
+    }
+
+    const tideRuns = [];
+    let t = null;
+    rows.forEach(r => {
+      const dir = r.cur >= 0 ? "flood" : "ebb";
+      if(!t || t.dir !== dir){ if(t) tideRuns.push(t); t = {dir, a:r.hh, b:r.hh, set:r.set}; }
+      else t.b = r.hh;
+    });
+    if(t) tideRuns.push(t);
+
+    const tideLine = tideRuns.map(x =>
+      `<strong>${pretty(x.a)}–${pretty(x.b)}</strong> tide ${x.dir}s, setting <strong>toward the ${point16(x.set)}</strong>`).join("<br>");
+
+    const verdict = runs.length
+      ? `<div class="badwin"><span class="lbl">Wind is fighting the tide</span>
+           ${runs.map(r=>`<span class="win">${r.a===r.b ? pretty(r.a) : pretty(r.a)+" – "+pretty(r.b)}</span>`).join(" ")}
+           <div class="w">Worst water of the day. Go either side of this, or drop yourself a band if you must cross it.</div></div>`
+      : `<div class="badwin ok"><span class="lbl">Wind and tide are not fighting today</span>
+           <div class="w">Nothing on ${esc(legName)} is being made worse by the current — either they're
+             lined up, or there isn't enough wind for it to matter. Judge it on wind alone.</div></div>`;
+
+    const table = rows.filter(r=>+r.hh.slice(0,2)%2===1).map(r=>`<tr>
+      <td>${r.hh}</td>
+      <td>from ${point16(r.from)} ${Math.round(r.wind)} kn</td>
+      <td style="color:var(--faint)">→ blowing toward ${point16((r.from+180)%360)}</td>
+      <td>${Math.abs(r.cur)<0.3 ? "slack" : `${r.cur>=0?"flood":"ebb"} toward ${point16(r.set)}`}</td>
+      <td class="${r.opposed?"b-red":"b-green"}">${Math.abs(r.cur)<0.3 ? "—" : (r.opposed?"FIGHTING":"with it")}</td></tr>`).join("");
+
+    today = `<div class="rule"><span class="lbl">Today on ${esc(legName)}</span>
+        <div style="font:400 14px/1.8 var(--sans);color:var(--dim)">${tideLine}</div></div>
+      ${verdict}
+      <div class="scroll" style="border-bottom:1px solid var(--rule)"><table style="font-size:12px">
+        <tr><th>Hr</th><th>Wind</th><th></th><th>Tide</th><th></th></tr>${table}</table></div>`;
+  }
+
+  return `<h2>Quick check — ${esc(route.label)}</h2>
+  <div class="cheat">
+    ${today}
+    <div class="rule"><span class="lbl">Check it yourself in four steps</span>
+      <ol class="steps">
+        <li>Open <a href="${LINKS.kelp.u}" target="_blank" rel="noopener">Kelp Reefs</a>.
+            Note the <strong>direction</strong> and the <strong>speed in knots</strong>.</li>
+        <li>Find that direction below and <strong>divide the speed by that number</strong>.</li>
+        <li>The answer is your wave height in metres. Compare to the three bands.</li>
+        <li>If the tide is fighting the wind (red above), <strong>drop one band</strong>.</li>
+      </ol>
+      <div class="divs"><span class="lbl2">Wind from &rarr; divide by</span>
+        <div class="dgrid">${SECTORS.map(d=>{
+          const km = route.legs[legIdx].fetch[d];
+          const div = Math.round(120/Math.sqrt(km));
+          const worst = div <= 25;
+          return `<div class="dcell${worst?" worst":""}"><div class="dd">${d}</div><div class="dv">÷${div}</div></div>`;
+        }).join("")}</div>
+        <div class="dnote">For <strong>${esc(legName)}</strong> — the most exposed leg of this route.
+          A small number is a bad direction (long open water); a big number is sheltered.
+          Worked example: Kelp Reefs reads <strong>SE 18 kn</strong> &rarr;
+          18 ÷ ${Math.round(120/Math.sqrt(route.legs[legIdx].fetch.SE))} =
+          <strong>${(18/Math.round(120/Math.sqrt(route.legs[legIdx].fetch.SE))).toFixed(2)} m</strong>.</div>
+      </div></div>
+    <div class="bands">
+      <div class="band"><div class="n b-green">under 0.4 m</div><div class="w">Good</div></div>
+      <div class="band"><div class="n b-yellow">0.4 – 0.7 m</div><div class="w">Bumpy — shorten the day</div></div>
+      <div class="band"><div class="n b-red">over 0.7 m</div><div class="w">Don't</div></div>
+    </div>
+    <div class="watch"><span class="lbl">Bad wind direction: ${esc(c.bad)}</span>
+      <ul>${c.watch.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
+    <div class="bail"><strong>If it's marginal:</strong> ${esc(c.bail)}</div>
+  </div>
+  <div class="note"><strong>Reading the two together:</strong> wind is named for where it comes
+    <em>from</em>; current is named for where it flows <em>to</em>. They fight when the wind is
+    blowing roughly opposite to the way the tide is setting — that's what the FIGHTING column marks.</div>`;
+}
+
+function renderLinks(route){
+  const keys = route.links || ["haro","summary","kelp","yyj"];
+  const items = keys.map(k => LINKS[k]).filter(Boolean);
+  if(!items.length) return "";
+  return `<h2>Check these before you go</h2>
+    <div class="note">This page is a model. These are the sources of truth — if they disagree with
+      the numbers above, believe them, not this.</div>
+    <table>${items.map(l=>`<tr>
+      <td class="name"><a href="${l.u}" target="_blank" rel="noopener">${esc(l.t)}</a></td>
+      <td style="color:var(--faint);font-family:var(--sans)">${esc(l.d)}</td></tr>`).join("")}</table>`;
+}
+
+function render(ev, win, model){
+  const route = ev.route;
+  document.getElementById("title").textContent = route.label;
+  document.getElementById("subtitle").innerHTML =
+    `${esc(HOME.name)} &nbsp;·&nbsp; ${route.nm} nm each way &nbsp;·&nbsp; ${BOAT.name}`;
+
+  let h = "";
+
+  if(TIDE_ERR) h += `<div class="note warn"><strong>Tides unavailable</strong> — ${esc(TIDE_ERR)}.
+    Wind and wave figures below are still good, but currents and slack times are missing, so
+    wind-against-current is <em>not</em> being checked and the numbers are optimistic.
+    Look up slack at <a href="https://www.tides.gc.ca" target="_blank" rel="noopener">tides.gc.ca</a>,
+    or see <em>If tides won't load</em> at the bottom of this page for a permanent fix.</div>`;
+
+  if(win){
+    h += `<h2>Your plan</h2>
+      <div class="verdict ${win.verdict}">
+        <div class="word">${WORD[win.verdict]}</div>
+        <div class="detail">${pretty(win.depHH)} out, ${pretty(win.retHH)} back<br>
+          ${win.tOut} min out · ${win.tBack} min back · about ${win.fuel} L (${win.fuelPct}% of tank)
+          ${win.turnsBadAt?`<br><span class="b-red">Conditions turn bad at ${pretty(win.turnsBadAt)}, while you are out there.</span>`:""}
+        </div></div>`;
+    if(win.reasons.length){
+      const seen = new Set();
+      const uniq = win.reasons.filter(r => !seen.has(r.leg+r.t) && seen.add(r.leg+r.t));
+      h += `<ul class="why">${uniq.map(r=>`<li class="${r.bad?"bad":""}"><strong>${esc(r.leg)}:</strong> ${esc(r.t)}</li>`).join("")}</ul>`;
+    }
+  }
+
+  h += `<h2>Hour by hour</h2>` + renderRibbon(ev, win ? [win.depHH, win.retHH] : null);
+
+  const best = bestWindows(ev);
+  h += `<h2>Best windows today</h2>`;
+  h += best.length
+    ? `<div class="scroll"><table><tr><th>Leave</th><th>Back</th><th>Verdict</th><th>Ashore</th><th>Transit</th><th>Fuel</th></tr>${
+        best.map(w=>`<tr class="pick" data-dep="${w.depHH}" data-ret="${w.retHH}">
+          <td>${pretty(w.depHH)}</td><td>${pretty(w.retHH)}</td>
+          <td class="b-${w.verdict}">${WORD[w.verdict]}</td>
+          <td>${w.ashore.toFixed(0)} h</td>
+          <td>${w.tOut} / ${w.tBack} min</td><td>~${w.fuel} L</td></tr>`).join("")}</table></div>
+       <p class="hint">Tap a row to load those times into the form.</p>`
+    : `<div class="note">No workable window today for this destination.</div>`;
+
+  const focusHH = win ? win.depHH : (ev.hours[Math.floor(ev.hours.length/2)]?.hh);
+  const focus = ev.hours.find(x=>x.hh===focusHH);
+  h += `<h2>Legs at ${pretty(focusHH)}</h2>` + renderLegs(focus);
+
+  const first = route.legs[0];
+  const _d = new Date(ev.hours[0].ms);
+  const dayISO = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,"0")}-${String(_d.getDate()).padStart(2,"0")}`;
+  const sl = slackTimes(currentSeries(first.cur, dayISO, first.peakKn, first.offsetMin) || [])
+    .filter(s => { const hh=new Date(s[0]).getHours(); return hh>=4 && hh<=22; });
+  if(sl.length){
+    h += `<h2>Slack water</h2><div class="note">
+      ${sl.map(s=>`${new Date(s[0]).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})} <span style="color:var(--faint)">(${s[1]})</span>`).join(" &nbsp;·&nbsp; ")}
+      <br><br>Derived from the rate of change of the tide curve, so the timing is about right but the
+      rate is indicative. For a narrow pass, check the official current tables.</div>`;
+  }
+
+  h += renderCanal(route, dayISO);
+
+  if(route.hazards) h += `<h2>Worth remembering</h2>` +
+    route.hazards.map(x=>`<div class="note warn">${esc(x)}</div>`).join("");
+
+  h += renderCheat(route, ev) + renderLinks(route);
+
+  h += `<div class="note">Wind model: <strong>${model==="gem_hrdps_continental"?"HRDPS 2.5 km (Environment Canada)":"blended global"}</strong>${TIDE_SRC?`. Tides ${esc(TIDE_SRC)}`:""}.
+    HRDPS only reaches about 48 hours out; beyond that this falls back to a coarser model that does not
+    resolve how wind funnels between the islands.</div>`;
+
+  document.getElementById("out").innerHTML = h;
+  document.querySelectorAll("tr.pick").forEach(tr => tr.onclick = () => {
+    document.getElementById("depart").value = tr.dataset.dep;
+    document.getElementById("ret").value = tr.dataset.ret;
+    run();
+  });
+}
+
+/* ------------------------------------------------------------------ boot */
+
+const $ = id => document.getElementById(id);
+
+function initRoutes(){
+  $("route").innerHTML = Object.entries(ROUTES)
+    .map(([k,r])=>`<option value="${k}">${esc(r.label)}</option>`).join("");
+  const now = new Date();
+  $("day").value = new Date(now.getTime()-now.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+}
+
+async function run(e){
+  if(e) e.preventDefault();
+  const routeKey = $("route").value, dayISO = $("day").value;
+  if(!dayISO) return;
+  $("run").disabled = true;
+  $("out").innerHTML = `<p class="loading">Fetching forecast and tides…</p>`;
+  try{
+    const route = ROUTES[routeKey];
+    const [wind] = await Promise.all([ loadWind(route.legs, dayISO), loadTides(dayISO) ]);
+    const currents = route.legs.map(l => currentSeries(l.cur, dayISO, l.peakKn, l.offsetMin));
+    const ev = evaluate(routeKey, dayISO, wind, currents);
+    if(!ev.hours.length){
+      $("out").innerHTML = `<div class="note err">No forecast available for that date.
+        Open-Meteo covers roughly today through two weeks out.</div>`;
+      return;
+    }
+    const dep = $("depart").value, ret = $("ret").value;
+    let win = null;
+    if(dep && ret && ret > dep){
+      const norm = t => t.slice(0,2)+":00";
+      win = evaluateWindow(ev, norm(dep), norm(ret));
+    }
+    render(ev, win, wind.model);
+  }catch(err){
+    $("out").innerHTML = `<div class="note err"><strong>Couldn't build the forecast.</strong><br>
+      ${esc(err.message)}<br><br>If you are offline this will not work. Otherwise the weather
+      service may be down — try again shortly, and read the
+      <a href="https://weather.gc.ca/marine/forecast_e.html?mapID=02&amp;siteID=06100" target="_blank" rel="noopener">official forecast</a> meanwhile.</div>`;
+  }finally{ $("run").disabled = false; }
+}
+
+initRoutes();
+$("controls").addEventListener("submit", run);
+document.querySelectorAll("details.about summary").forEach(x=>x.setAttribute("tabindex","0"));
+run();
+</script>
+</body>
+</html>
