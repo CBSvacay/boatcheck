@@ -155,22 +155,27 @@ tr.pick:hover td{background:var(--panel)}
 .suggest .w strong{color:var(--text);font-weight:500}
 
 .flag{color:var(--marg)}
-/* per-leg verification links — discrete cards so they stay legible on a phone */
-.lgrp{margin:0 0 26px}
+/* Per-leg verification links. Deliberately built from block-level <div>s so
+   that even with the stylesheet missing entirely they stack one per line
+   instead of running together. */
+.lgrp{margin:0 0 28px}
 .lgrp .lname{font:500 12px var(--cond);letter-spacing:.16em;text-transform:uppercase;
-  color:var(--mark);padding:0 0 10px;margin-bottom:11px;border-bottom:1px solid var(--rule)}
+  color:var(--mark);padding:0 0 10px;margin-bottom:12px;border-bottom:1px solid var(--rule)}
+.lrow{display:block;margin-bottom:10px}
+.lrow:last-child{margin-bottom:0}
 .lnk{display:block;position:relative;text-decoration:none;
   background:var(--panel);border:1px solid var(--rule);border-radius:3px;
-  padding:14px 40px 14px 15px;margin-bottom:10px}
-.lnk:last-child{margin-bottom:0}
+  padding:14px 40px 14px 15px}
 .lnk:hover{border-color:var(--rule-hi);background:var(--panel2)}
-.lnk::after{content:"\2197";position:absolute;right:15px;top:14px;color:var(--rule-hi);font:400 15px var(--sans)}
+.lnk::after{content:"\2197";position:absolute;right:15px;top:14px;
+  color:var(--rule-hi);font:400 15px var(--sans)}
 .lnk:hover::after{color:var(--mark)}
-.lnk .t{display:block;font:500 15px/1.35 var(--sans);color:var(--mark)}
-.lnk .t em{display:block;font-style:normal;font:400 11px var(--cond);letter-spacing:.14em;
-  text-transform:uppercase;color:var(--faint);margin-top:4px}
+.lnk .t{display:block;font:500 15px/1.35 var(--sans);color:var(--mark);text-decoration:none}
+.lnk .tag{display:block;font:400 11px var(--cond);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--faint);margin-top:5px}
 .lnk .d{display:block;font:400 13px/1.55 var(--sans);color:var(--faint);margin-top:6px}
-@media (max-width:600px){ .lnk{padding:15px 38px 15px 14px;margin-bottom:12px} }
+@media (max-width:600px){ .lnk{padding:15px 38px 15px 14px} .lrow{margin-bottom:12px} }
+
 .note{background:var(--panel);border-left:3px solid var(--rule-hi);padding:12px 16px;
   color:var(--dim);font:400 13px/1.6 var(--sans);margin:12px 0}
 .note.warn{border-left-color:var(--marg)}
@@ -1117,9 +1122,10 @@ function renderLinks(route){
     if(!st.length) return "";
     return `<div class="lgrp">
       <div class="lname">${i+1}. ${esc(leg.name)}</div>
-      ${st.map((l,j)=>`<a class="lnk" href="${l.u}" target="_blank" rel="noopener">
-        <span class="t">${esc(l.t)}${j===0?'<em>Check this one first</em>':''}</span>
-        <span class="d">${esc(l.d)}</span></a>`).join("")}
+      ${st.map((l,j)=>`<div class="lrow"><a class="lnk" href="${l.u}" target="_blank" rel="noopener">
+        <div class="t">${esc(l.t)}</div>
+        ${j===0?'<div class="tag">Check this one first</div>':''}
+        <div class="d">${esc(l.d)}</div></a></div>`).join("")}
     </div>`;
   }).join("");
 
@@ -1134,8 +1140,9 @@ function renderLinks(route){
     ${legBlocks}
     ${wide.length ? `<div class="lgrp">
       <div class="lname">Whole trip — forecasts &amp; tides</div>
-      ${wide.map(l=>`<a class="lnk" href="${l.u}" target="_blank" rel="noopener">
-        <span class="t">${esc(l.t)}</span><span class="d">${esc(l.d)}</span></a>`).join("")}
+      ${wide.map(l=>`<div class="lrow"><a class="lnk" href="${l.u}" target="_blank" rel="noopener">
+        <div class="t">${esc(l.t)}</div>
+        <div class="d">${esc(l.d)}</div></a></div>`).join("")}
     </div>` : ""}`;
 }
 
