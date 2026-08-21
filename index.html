@@ -74,6 +74,16 @@ h2{font:500 12px/1 var(--cond);letter-spacing:.2em;text-transform:uppercase;colo
 .cell.red .bar{background:var(--stop)}
 .cell.sel{background:var(--panel2)}
 .cell .wd{color:var(--dim);font-size:10px}
+.cell .lg{font:500 9px var(--cond);letter-spacing:.08em;text-transform:uppercase;
+  color:var(--mark);margin-top:4px;padding-top:4px;border-top:1px solid var(--rule)}
+.legkey{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;margin:10px 0 0;
+  padding:10px 0 0;border-top:1px solid var(--rule)}
+.legkey .lbl3{font:500 11px var(--cond);letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.legkey .lk{font:400 13px var(--sans);color:var(--text)}
+.legkey .lk.off{color:var(--faint)}
+.legkey .lk b{display:inline-block;min-width:17px;height:17px;line-height:17px;text-align:center;
+  background:var(--rule-hi);color:var(--text);border-radius:2px;font:500 11px var(--mono);margin-right:5px}
+.legkey .lk.off b{background:var(--rule);color:var(--faint)}
 .legend{display:flex;gap:18px;flex-wrap:wrap;color:var(--faint);font:400 12px var(--sans);margin:10px 0 0}
 .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:baseline}
 
@@ -321,7 +331,7 @@ const LINKS = {
 
 const ROUTES = {
   sidney_island: { label: "Sidney Island (Sidney Spit)", nm: 3.2, legs: [
-    { name:"Sidney Channel crossing", lat:48.6520, lon:-123.3620,
+    { name:"Sidney Channel crossing", obs:["kelp","yyj"], lat:48.6520, lon:-123.3620,
       cur:"sidney", floodSet:340, peakKn:2.5, offsetMin:0,
       fetch:{N:5,NE:8,E:12,SE:35,S:30,SW:3,W:2,NW:6},
       note:"Open to the southeast down Haro Strait. The spit dries a long way northwest — give it room." }
@@ -335,12 +345,12 @@ const ROUTES = {
         "Only 3 nm — you can turn around. Go look, and come back if you don't like it."
       ],
       bail:"Portland Island instead — sheltered the whole way." },
-     links:["haro","summary","kelp","yyj","discovery","tideSidney"]},
+     links:["haro","summary","tideSidney","tables"]},
   darcy_island: { label: "D'Arcy Island", nm: 7.0, legs: [
-    { name:"Sidney Channel crossing", lat:48.6520, lon:-123.3620,
+    { name:"Sidney Channel crossing", obs:["kelp","yyj"], lat:48.6520, lon:-123.3620,
       cur:"sidney", floodSet:340, peakKn:2.5, offsetMin:0,
       fetch:{N:5,NE:8,E:12,SE:35,S:30,SW:3,W:2,NW:6} },
-    { name:"Haro Strait, off D'Arcy", lat:48.5800, lon:-123.2800,
+    { name:"Haro Strait, off D'Arcy", obs:["kelp","discovery","racerocks"], lat:48.5800, lon:-123.2800,
       cur:"sidney", floodSet:350, peakKn:3.0, offsetMin:0,
       fetch:{N:10,NE:12,E:15,SE:40,S:35,SW:10,W:8,NW:12},
       note:"Genuinely open water. Treat this a full band tighter than Sidney Spit." }
@@ -354,9 +364,9 @@ const ROUTES = {
         "If it's marginal at Sidney Spit, it's a no at D'Arcy."
       ],
       bail:"Stop at Sidney Spit and don't carry on south." },
-     links:["haro","jdf","summary","kelp","discovery","racerocks","yyj","tideSidney"]},
+     links:["haro","jdf","summary","tideSidney","tables"]},
   portland_island: { label: "Portland Island (Princess Margaret)", nm: 6.5, legs: [
-    { name:"Colburne & Moresby passages", lat:48.6900, lon:-123.3800,
+    { name:"Colburne & Moresby passages", obs:["yyj"], lat:48.6900, lon:-123.3800,
       cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
       fetch:{N:4,NE:5,E:6,SE:6,S:4,SW:3,W:3,NW:10},
       note:"Your bad-weather substitute — behind land nearly the whole way. Ferry wash is the main nuisance." }
@@ -369,16 +379,16 @@ const ROUTES = {
         "Current runs 2–3 kn through the passages — noticeable, not a problem at your speed."
       ],
       bail:"None needed. This is the bail-out." },
-     links:["haro","summary","yyj","kelp","tideSidney"]},
+     links:["haro","summary","tideSidney"]},
   pender: { label: "Pender Island (Bedwell / Port Browning)", nm: 13.0, legs: [
-    { name:"Moresby Passage", lat:48.7000, lon:-123.3600,
+    { name:"Moresby Passage", obs:["yyj","kelp"], lat:48.7000, lon:-123.3600,
       cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
       fetch:{N:6,NE:6,E:8,SE:10,S:6,SW:4,W:4,NW:8} },
-    { name:"Swanson Channel crossing", lat:48.7500, lon:-123.3200,
+    { name:"Swanson Channel crossing", obs:["kelp","saturna"], lat:48.7500, lon:-123.3200,
       cur:"activepass", floodSet:310, peakKn:3.5, offsetMin:-35,
       fetch:{N:8,NE:10,E:12,SE:25,S:20,SW:15,W:6,NW:12},
       note:"Active ferry route — cross square to it and get across promptly." },
-    { name:"Bedwell Harbour approach", lat:48.7450, lon:-123.2400,
+    { name:"Bedwell Harbour approach", obs:["saturna","kelp"], lat:48.7450, lon:-123.2400,
       cur:"activepass", floodSet:300, peakKn:2.0, offsetMin:-35,
       fetch:{N:5,NE:6,E:8,SE:20,S:12,SW:10,W:5,NW:6} }
   ], cheat:{
@@ -391,7 +401,7 @@ const ROUTES = {
         "For the canal: go near high water. Depth is what stops you, not the bridge."
       ],
       bail:"Portland Island, or anchor in Bedwell and wait out the afternoon." },
-     links:["haro","sog","summary","kelp","saturna","yyj","tideActive","tideBedwell","tables"],
+     links:["haro","sog","summary","tideBedwell","tideActive","tables"],
      canal:{ name:"Pender Canal", tide:"bedwell",
        floodTowards:"north into Port Browning", ebbTowards:"south into Bedwell Harbour",
        lowTideCautionM:1.5 },
@@ -399,14 +409,14 @@ const ROUTES = {
     "Pender Canal is narrow and shallow with a low fixed bridge. Your boat has no air draft problem — depth and current are what matter. The alternative is the long way round via Plumper Sound."
   ]},
   ganges: { label: "Ganges Marina, Salt Spring", nm: 19.0, legs: [
-    { name:"Colburne & Moresby passages", lat:48.6900, lon:-123.3800,
+    { name:"Colburne & Moresby passages", obs:["yyj"], lat:48.6900, lon:-123.3800,
       cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
       fetch:{N:4,NE:5,E:6,SE:6,S:4,SW:3,W:3,NW:10} },
-    { name:"Satellite Channel", lat:48.7200, lon:-123.4500,
+    { name:"Satellite Channel", obs:["yyj","kelp"], lat:48.7200, lon:-123.4500,
       cur:"sidney", floodSet:100, peakKn:2.0, offsetMin:0,
       fetch:{N:5,NE:6,E:8,SE:8,S:5,SW:8,W:15,NW:14},
       note:"Afternoon westerly funnels out of Saanich Inlet and Sansum Narrows. The zone forecast underplays this." },
-    { name:"Captain Passage & Ganges approach", lat:48.8300, lon:-123.4500,
+    { name:"Captain Passage & Ganges approach", obs:["saturna","kelp"], lat:48.8300, lon:-123.4500,
       cur:"activepass", floodSet:320, peakKn:2.0, offsetMin:-50,
       fetch:{N:6,NE:8,E:10,SE:18,S:10,SW:6,W:5,NW:15},
       note:"The harbour opens southeast and the approach has reefs. A southeasterly is the bad one here." }
@@ -420,7 +430,7 @@ const ROUTES = {
         "Early start, firm turnaround time, or plan to stay the night."
       ],
       bail:"Turn into Portland Island or Montague and wait, rather than pushing home late." },
-     links:["haro","sog","summary","yyj","kelp","saturna","tideGanges","tideActive"],
+     links:["haro","sog","summary","tideGanges","tideActive","tables"],
      hazards:[
     "38 nm round trip. At a 15 kn chop cruise that is about 80 minutes each way — plan fuel with real reserve."
   ]}
@@ -800,22 +810,37 @@ function renderRibbon(ev, sel){
         <polyline points="${poly}" fill="none" stroke="#2C4B59" stroke-width="1.5"/>${marks}</svg>`;
     }
   }
+  const multi = ev.route.legs.length > 1;
+  const used = new Set();
   const cells = ev.hours.map(h => {
-    const w = h.legs.reduce((a,b)=>b.hs>a.hs?b:a);
+    // index of the leg driving this hour, so the strip can name it
+    let wi = 0;
+    h.legs.forEach((l,i) => { if(l.hs > h.legs[wi].hs) wi = i; });
+    const w = h.legs[wi];
+    used.add(wi);
     const inSel = sel && h.hh>=sel[0] && h.hh<=sel[1];
     return `<div class="cell ${h.band}${inSel?" sel":""}">
       <div class="hr">${h.hh.slice(0,2)}</div><div class="bar"></div>
       <div>${w.hs.toFixed(2)}</div>
-      <div class="wd">${sectorFor(w.from)}${Math.round(w.wind)}</div></div>`;
+      <div class="wd">${sectorFor(w.from)}${Math.round(w.wind)}</div>
+      ${multi?`<div class="lg" title="${esc(w.name)}">leg ${wi+1}</div>`:""}</div>`;
   }).join("");
+
+  const legKey = multi
+    ? `<div class="legkey"><span class="lbl3">Worst leg shown</span>${
+        ev.route.legs.map((l,i)=>`<span class="lk${used.has(i)?"":" off"}">
+          <b>${i+1}</b> ${esc(l.name)}</span>`).join("")}</div>`
+    : `<div class="legkey"><span class="lbl3">Single leg</span>
+        <span class="lk"><b>1</b> ${esc(ev.route.legs[0].name)}</span></div>`;
   return `<div class="ribbon"><div class="ribbon-inner">${svg}<div class="cells">${cells}</div></div></div>
+  ${legKey}
   <div class="legend">
     <span><i style="background:#4FB286"></i>Go</span>
     <span><i style="background:#E0A33E"></i>Marginal</span>
     <span><i style="background:#D8563F"></i>Don't</span>
     <span><i style="background:#2C4B59"></i>Tide curve</span>
     <span><i style="background:#5BC8D4"></i>Slack water</span>
-    <span>Numbers are wave height (m) and wind (kn) on the worst leg.</span></div>`;
+    <span>Wave height (m) and wind (kn) on whichever leg is worst that hour.</span></div>`;
 }
 
 function renderLegs(hour){
@@ -979,7 +1004,8 @@ function renderCheat(route, ev){
     ${today}
     <div class="rule"><span class="lbl">Check it yourself in four steps</span>
       <ol class="steps">
-        <li>Open <a href="${LINKS.kelp.u}" target="_blank" rel="noopener">Kelp Reefs</a>.
+        <li>Open <a href="${(LINKS[(route.legs[legIdx].obs||["kelp"])[0]]||LINKS.kelp).u}"
+            target="_blank" rel="noopener">${esc((LINKS[(route.legs[legIdx].obs||["kelp"])[0]]||LINKS.kelp).t)}</a>.
             Note the <strong>direction</strong> and the <strong>speed in knots</strong>.</li>
         <li>Find that direction below and <strong>divide the speed by that number</strong>.</li>
         <li>The answer is your wave height in metres. Compare to the three bands.</li>
@@ -994,7 +1020,7 @@ function renderCheat(route, ev){
         }).join("")}</div>
         <div class="dnote">For <strong>${esc(legName)}</strong> — the most exposed leg of this route.
           A small number is a bad direction (long open water); a big number is sheltered.
-          Worked example: Kelp Reefs reads <strong>SE 18 kn</strong> &rarr;
+          Worked example: it reads <strong>SE 18 kn</strong> &rarr;
           18 ÷ ${Math.round(120/Math.sqrt(route.legs[legIdx].fetch.SE))} =
           <strong>${(18/Math.round(120/Math.sqrt(route.legs[legIdx].fetch.SE))).toFixed(2)} m</strong>.</div>
       </div></div>
@@ -1013,15 +1039,33 @@ function renderCheat(route, ev){
 }
 
 function renderLinks(route){
-  const keys = route.links || ["haro","summary","kelp","yyj"];
-  const items = keys.map(k => LINKS[k]).filter(Boolean);
-  if(!items.length) return "";
-  return `<h2>Check these before you go</h2>
+  /* Grouped by leg, so you know which station covers which patch of water,
+     then the whole-trip forecasts and tide pages underneath. */
+  const legBlocks = route.legs.map((leg, i) => {
+    const st = (leg.obs || []).map(k => LINKS[k]).filter(Boolean);
+    if(!st.length) return "";
+    return `<div class="lgrp">
+      <div class="lname">${i+1}. ${esc(leg.name)}</div>
+      ${st.map((l,j)=>`<a class="lnk" href="${l.u}" target="_blank" rel="noopener">
+        <span class="t">${esc(l.t)}${j===0?' <em>— check this one first</em>':''}</span>
+        <span class="d">${esc(l.d)}</span></a>`).join("")}
+    </div>`;
+  }).join("");
+
+  const wide = (route.links || []).map(k=>LINKS[k]).filter(Boolean)
+    .filter(l => !Object.values(route.legs).some(lg =>
+      (lg.obs||[]).some(k => LINKS[k] && LINKS[k].t === l.t)));
+
+  return `<h2>Check these yourself</h2>
     <div class="note">This page is a model. These are the sources of truth — if they disagree with
-      the numbers above, believe them, not this.</div>
-    <table>${items.map(l=>`<tr>
-      <td class="name"><a href="${l.u}" target="_blank" rel="noopener">${esc(l.t)}</a></td>
-      <td style="color:var(--faint);font-family:var(--sans)">${esc(l.d)}</td></tr>`).join("")}</table>`;
+      the numbers above, believe them, not this. Stations are listed against the leg they actually
+      cover, in the order you'll cross them.</div>
+    ${legBlocks}
+    ${wide.length ? `<div class="lgrp">
+      <div class="lname">Whole trip — forecasts &amp; tides</div>
+      ${wide.map(l=>`<a class="lnk" href="${l.u}" target="_blank" rel="noopener">
+        <span class="t">${esc(l.t)}</span><span class="d">${esc(l.d)}</span></a>`).join("")}
+    </div>` : ""}`;
 }
 
 function render(ev, win, model){
