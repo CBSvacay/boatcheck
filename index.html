@@ -100,6 +100,77 @@ tr.pick:hover td{background:var(--panel)}
 .why li{margin:2px 0}
 .why li.bad{color:var(--stop)}
 
+/* today's tide-vs-wind + the manual cheat sheet */
+.cheat{background:var(--panel);border:1px solid var(--rule-hi);border-radius:3px;margin:6px 0 18px}
+.cheat .rule{padding:16px 18px;border-bottom:1px solid var(--rule)}
+.cheat .rule .lbl{display:block;font:500 11px var(--cond);letter-spacing:.18em;
+  text-transform:uppercase;color:var(--dim);margin-bottom:9px}
+.cheat .rule .eq{font:400 17px/1.45 var(--mono);color:var(--mark)}
+.cheat .steps{margin:0;padding-left:19px;font:400 14px/1.7 var(--sans);color:var(--dim)}
+.cheat .steps li{margin:6px 0}
+.cheat .steps strong{color:var(--text);font-weight:500}
+.cheat .steps a{color:var(--mark)}
+.cheat .divs{margin-top:16px;padding-top:15px;border-top:1px solid var(--rule)}
+.cheat .lbl2{display:block;font:500 11px var(--cond);letter-spacing:.18em;
+  text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+.cheat .dgrid{display:grid;grid-template-columns:repeat(8,1fr);gap:1px;background:var(--rule);
+  border:1px solid var(--rule);border-radius:2px;overflow:hidden}
+.cheat .dcell{background:var(--hull);padding:10px 2px;text-align:center}
+.cheat .dcell.worst{background:#2A1A18}
+.cheat .dcell .dd{font:500 11px var(--cond);letter-spacing:.1em;color:var(--dim)}
+.cheat .dcell .dv{font:400 16px var(--mono);color:var(--text);margin-top:3px}
+.cheat .dcell.worst .dv{color:var(--stop)}
+.cheat .dnote{font:400 13px/1.6 var(--sans);color:var(--faint);margin-top:11px}
+.cheat .dnote strong{color:var(--text);font-weight:500}
+.cheat .badwin{padding:15px 18px;border-bottom:1px solid var(--rule);border-left:3px solid var(--stop)}
+.cheat .badwin.ok{border-left-color:var(--go)}
+.cheat .badwin .lbl{display:block;font:500 11px var(--cond);letter-spacing:.18em;
+  text-transform:uppercase;color:var(--dim);margin-bottom:9px}
+.cheat .badwin .win{display:inline-block;font:400 18px var(--mono);color:var(--stop);margin-right:16px}
+.cheat .badwin .w{font:400 13px/1.6 var(--sans);color:var(--dim);margin-top:8px}
+.cheat .bands{display:flex;flex-wrap:wrap;border-bottom:1px solid var(--rule)}
+.cheat .band{flex:1 1 30%;min-width:118px;padding:13px 18px;border-right:1px solid var(--rule)}
+.cheat .band:last-child{border-right:0}
+.cheat .band .n{font:400 19px/1.2 var(--mono)}
+.cheat .band .w{font:400 12px var(--sans);color:var(--dim);margin-top:4px}
+.cheat .watch{padding:15px 18px}
+.cheat .watch .lbl{display:block;font:500 11px var(--cond);letter-spacing:.18em;
+  text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+.cheat .watch ul{margin:0;padding-left:17px;font:400 14px/1.65 var(--sans)}
+.cheat .watch li{margin:7px 0}
+.cheat .bail{padding:14px 18px;border-top:1px solid var(--rule);
+  font:400 14px/1.6 var(--sans);color:var(--dim)}
+.cheat .bail strong{color:var(--text);font-weight:500}
+@media (max-width:520px){ .cheat .dgrid{grid-template-columns:repeat(4,1fr)} }
+
+/* "shift your times" suggestion */
+.suggest{background:var(--panel);border:1px solid var(--mark);border-radius:3px;
+  padding:15px 18px;margin:14px 0 4px;cursor:pointer}
+.suggest:hover{background:var(--panel2)}
+.suggest .lbl{display:block;font:500 11px var(--cond);letter-spacing:.18em;
+  text-transform:uppercase;color:var(--mark);margin-bottom:9px}
+.suggest .times{font:400 25px/1.2 var(--cond);letter-spacing:.02em}
+.suggest .times .v{font-size:16px;margin-left:11px}
+.suggest .w{font:400 13px/1.6 var(--sans);color:var(--dim);margin-top:8px}
+.suggest .w strong{color:var(--text);font-weight:500}
+
+.flag{color:var(--marg)}
+/* per-leg verification links — discrete cards so they stay legible on a phone */
+.lgrp{margin:0 0 26px}
+.lgrp .lname{font:500 12px var(--cond);letter-spacing:.16em;text-transform:uppercase;
+  color:var(--mark);padding:0 0 10px;margin-bottom:11px;border-bottom:1px solid var(--rule)}
+.lnk{display:block;position:relative;text-decoration:none;
+  background:var(--panel);border:1px solid var(--rule);border-radius:3px;
+  padding:14px 40px 14px 15px;margin-bottom:10px}
+.lnk:last-child{margin-bottom:0}
+.lnk:hover{border-color:var(--rule-hi);background:var(--panel2)}
+.lnk::after{content:"\2197";position:absolute;right:15px;top:14px;color:var(--rule-hi);font:400 15px var(--sans)}
+.lnk:hover::after{color:var(--mark)}
+.lnk .t{display:block;font:500 15px/1.35 var(--sans);color:var(--mark)}
+.lnk .t em{display:block;font-style:normal;font:400 11px var(--cond);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--faint);margin-top:4px}
+.lnk .d{display:block;font:400 13px/1.55 var(--sans);color:var(--faint);margin-top:6px}
+@media (max-width:600px){ .lnk{padding:15px 38px 15px 14px;margin-bottom:12px} }
 .note{background:var(--panel);border-left:3px solid var(--rule-hi);padding:12px 16px;
   color:var(--dim);font:400 13px/1.6 var(--sans);margin:12px 0}
 .note.warn{border-left-color:var(--marg)}
@@ -1047,7 +1118,7 @@ function renderLinks(route){
     return `<div class="lgrp">
       <div class="lname">${i+1}. ${esc(leg.name)}</div>
       ${st.map((l,j)=>`<a class="lnk" href="${l.u}" target="_blank" rel="noopener">
-        <span class="t">${esc(l.t)}${j===0?' <em>— check this one first</em>':''}</span>
+        <span class="t">${esc(l.t)}${j===0?'<em>Check this one first</em>':''}</span>
         <span class="d">${esc(l.d)}</span></a>`).join("")}
     </div>`;
   }).join("");
