@@ -726,6 +726,7 @@ const worseOf = (a,b) => ({green:0,yellow:1,red:2}[a] >= {green:0,yellow:1,red:2
 
 let TIDES = null, TIDE_ERR = null, TIDE_SRC = null;
 let BULLETIN = null, BULLETIN_ERR = null, BULLETIN_PENDING = false, RUN_TOKEN = 0;
+let FORCE_BULLETIN = false;   // set by "Try again now"; never deletes the cache
 let MANUAL_KN = null;   // wind the user typed from the official bulletin
 
 /* Environment Canada marine zones. There is no "Gulf Islands" zone — Haro
@@ -784,13 +785,18 @@ function cachedZone(zone){
 }
 
 /* Fetch one zone. weather.gc.ca sends no CORS header, so the direct call fails
-   in a browser and two public relays are raced alongside it. */
+   in a browser and several public relays are raced alongside it. They are free
+   services and go down without notice, so the list is deliberately longer than
+   it needs to be — Promise.any takes whichever answers first. */
 async function fetchZone(zone){
   const feed = zoneAtom(zone);
   const routes = [
     ["direct", feed],
     ["via r.jina.ai", "https://r.jina.ai/" + feed],
-    ["via allorigins", "https://api.allorigins.win/raw?url=" + encodeURIComponent(feed)]
+    ["via allorigins", "https://api.allorigins.win/raw?url=" + encodeURIComponent(feed)],
+    ["via corsproxy.io", "https://corsproxy.io/?url=" + encodeURIComponent(feed)],
+    ["via codetabs", "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(feed)],
+    ["via isomorphic-git", "https://cors.isomorphic-git.org/" + feed]
   ];
   const attempt = async ([label, url]) => {
     const ctl = new AbortController();
@@ -2101,15 +2107,14 @@ function render(ev, win, model){
   if(rb) rb.onclick = (e) => {
     e.preventDefault();
     rb.textContent = "fetching…";
-    /* Was: localStorage.removeItem("ec_bulletin") — wrong key, so this cleared
-       nothing and the refresh only worked because the stale flag re-fetched
-       anyway. Caching itself is deliberate and stays: weather.gc.ca is often
-       unreachable, and a stored bulletin with an age warning on it beats no
-       bulletin at all. */
-    try{
-      (ev.route.zones || ["haro"]).forEach(z => localStorage.removeItem("ec_bulletin_"+z));
-    }catch(err){}
-    BULLETIN = null; BULLETIN_ERR = null;
+    /* Force a re-fetch WITHOUT deleting what's stored. An earlier version of
+       this deleted the cached bulletins first — which threw away the fallback
+       at the exact moment it was needed, since the usual reason for pressing
+       this is that the relays are failing. fetchZone() overwrites the cache on
+       success and loadBulletins() falls back to it on failure, so forcing the
+       attempt is all that's required. */
+    FORCE_BULLETIN = true;
+    BULLETIN_ERR = null;
     run();
   };
 
@@ -2198,8 +2203,9 @@ async function run(e){
     if(!draw()) return;
 
     // Refresh in the background if anything is missing or past its 15 minutes.
-    const needsRefresh = !cached ||
+    const needsRefresh = FORCE_BULLETIN || !cached ||
       zones.some(z => !cached.zones[z] || cached.zones[z].stale);
+    FORCE_BULLETIN = false;
     if(needsRefresh){
       const token = ++RUN_TOKEN;
       loadBulletins(zones).then(() => {
