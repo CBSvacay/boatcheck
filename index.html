@@ -288,11 +288,11 @@ footer a{color:var(--mark)}
   </div>
   <div class="f">
     <label for="depart">Leave at</label>
-    <input type="time" id="depart" step="3600">
+    <select id="depart"></select>
   </div>
   <div class="f">
     <label for="ret">Back by</label>
-    <input type="time" id="ret" step="3600">
+    <select id="ret"></select>
   </div>
   <div class="f">
     <label for="offwind">Forecast wind <span class="opt">optional</span></label>
@@ -419,6 +419,64 @@ resolve funnelling between the islands. The page tells you which it used.</li>
 <li>Nothing here knows about fog, and fog is what most often catches an open boat with no radar on
 an August morning. Read the visibility line in the official forecast.</li>
 </ul>
+</div></details>
+
+<details class="about"><summary>What changed, and why</summary><div class="body">
+<p>Five updates. The old code for anything risky is kept in comments inside the
+<code>&lt;script&gt;</code> block, so any of it can be put back by hand.</p>
+
+<p><strong>1. Currents no longer read too strong on quiet days.</strong>
+The page used to fetch a single day of tide, then treat that day's biggest current as
+full strength. So a weak neap tide got described exactly like a big spring tide. It now
+pulls eight days and judges the day against that range. Slack <em>times</em> have not
+moved — only the strength, and it will read lower on small-tide days. Expect fewer
+"wind is fighting the tide" flags, and for the ones that remain to mean more.</p>
+
+<p><strong>2. Warnings stop at 48 hours.</strong>
+An Environment Canada warning describes the next day or two, but nothing in the data
+says which days it covers. Previously a warning in effect today would colour a trip
+you were planning for next week. Now:</p>
+<ul>
+<li>Inside 48 hours — the warning applies exactly as before.</li>
+<li>Beyond 48 hours — warnings are not read, not listed and not applied. You get one
+plain message saying so, and nothing else about them.</li>
+<li>Beyond 48 hours, if no official wind figure applies either, the verdict is marked
+<strong>unverified</strong>. Model output only, with nothing checking it. Fine for
+spotting a promising day; not something to commit to.</li>
+</ul>
+<p>The bulletin also no longer reaches past about five days. Day names repeat weekly,
+so "Thursday" in the extended forecast was matching a Thursday eight days out.</p>
+
+<p><strong>3. Times are half-hour slots.</strong>
+Leave-at and back-by are dropdowns now rather than free entry, because the forecast is
+hourly and offering 5:17 would misrepresent the resolution. Pick any :00 or :30 between
+5&nbsp;am and 9:30&nbsp;pm, or leave both blank for best windows. A half-hour still has
+to land on a whole one to be graded, so your departure rounds <em>down</em> and your
+return rounds <em>up</em> — both toward the longer, more exposed day. A 5:30&nbsp;pm
+return is graded against 6&nbsp;pm rather than 5. The plan panel tells you when it has
+done this and which hours it actually used.</p>
+
+<p><strong>4. Weather across the route.</strong>
+Average air temperature, the range, what the sky is doing, rain, and visibility hour by
+hour. With a plan entered it covers your window; without one, the whole day. This data
+was already being downloaded for every leg and hour — it was only being read to spot
+thunderstorms, and thrown away otherwise. Note it is <em>air</em> temperature. The water
+stays around 10–12&nbsp;°C all summer.</p>
+
+<p><strong>5. Two small fixes.</strong>
+The "try again now" link on a stale bulletin was clearing a cache key that didn't exist,
+so it never actually cleared anything — it only appeared to work because the staleness
+check re-fetched anyway. It now clears the real keys. Caching itself is deliberate and
+unchanged: weather.gc.ca is often unreachable, and a stored bulletin with an age warning
+on it beats no bulletin at all. The manual <em>Forecast wind</em> box is untouched and
+remains the fallback when nothing loads. Separately, a leftover from an old rename and a
+piece of text being cleaned twice were tidied up; neither changed what you see.</p>
+
+<p><strong>Worth checking once it's live.</strong> Pick a small-tide day and see whether
+the wind-against-tide flags have thinned out. If they've gone quiet on days that
+genuinely felt fine on the water, that's the first change doing its job. And keep the
+log — what the page said against how the boat actually felt. A season of that beats
+every default in this file.</p>
 </div></details>
 
 <footer>
@@ -783,7 +841,22 @@ function cachedBulletins(zones){
    being planned, so a Sunday trip isn't judged against Saturday's gale. */
 const DAYNAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
+/* How far ahead the day being planned is. Warnings describe the next day or
+   two, and the bulletin itself only covers about five days. Beyond those, the
+   honest answer is that it says nothing about your day — not that today's gale
+   applies to it. */
+const WARN_HORIZON_H = 48;
+const BULLETIN_HORIZON_H = 120;
+function hoursOut(dayISO){
+  const noon = new Date(dayISO+"T12:00:00").getTime();
+  return isNaN(noon) ? 1e6 : (noon - Date.now())/36e5;
+}
+const withinWarnHorizon = dayISO => hoursOut(dayISO) <= WARN_HORIZON_H;
+
 function zoneForDay(zoneData, dayISO){
+  /* Day names repeat weekly, so "Thursday" in the extended forecast would
+     otherwise match a Thursday eight days out. */
+  if(hoursOut(dayISO) > BULLETIN_HORIZON_H) return null;
   const want = DAYNAMES[new Date(dayISO+"T12:00:00").getDay()];
   const today = new Date(); today.setHours(0,0,0,0);
   const dayOffset = Math.round((new Date(dayISO+"T00:00:00") - today)/864e5);
@@ -802,6 +875,10 @@ function zoneForDay(zoneData, dayISO){
     const kn = officialMaxKn(zoneData.forecast.text);
     if(kn) return {maxKn:kn, text:zoneData.forecast.text, exact:false};
   }
+  /* Last resort: the strongest figure anywhere in the bulletin. Only honest for
+     a day the bulletin genuinely covers — otherwise a Tuesday gale would be
+     applied to next weekend. */
+  if(!withinWarnHorizon(dayISO)) return null;
   const kn = officialMaxKn((zoneData.forecast?.text||"") + " " + (zoneData.extended?.text||""));
   return kn ? {maxKn:kn, text:"", exact:false} : null;
 }
@@ -896,8 +973,11 @@ async function stationSeries(st, fromISO, toISO){
 /* Tide predictions for the day, straight from the Canadian Hydrographic
    Service. Currents and slack times are derived from these. */
 async function loadTides(dayISO){
-  const from = new Date(dayISO+"T00:00:00"); from.setHours(from.getHours()-6);
-  const to   = new Date(dayISO+"T00:00:00"); to.setHours(to.getHours()+30);
+  /* Was -6h to +30h — a single day. The day's own strongest current was then
+     normalised to peakKn, so every day read as a spring tide. Eight days gives
+     currentSeries() a real spring-to-neap range to scale against. */
+  const from = new Date(dayISO+"T00:00:00"); from.setDate(from.getDate()-4);
+  const to   = new Date(dayISO+"T00:00:00"); to.setDate(to.getDate()+4);
   const iso = d => d.toISOString().slice(0,19)+"Z";
   try{
     const list = await stationIndex();
@@ -956,17 +1036,26 @@ function currentSeries(stationKey, dayISO, peakKn, offsetMin){
   if(!raw) return null;
   const pts = raw.map(([t,v]) => [new Date(t).getTime(), v])
                  .sort((a,b)=>a[0]-b[0]);
-  const d0 = new Date(dayISO+"T00:00:00").getTime() - 36e5;
-  const d1 = d0 + 26*36e5;
-  const win = pts.filter(p => p[0]>=d0 && p[0]<=d1);
-  if(win.length < 3) return null;
+  if(pts.length < 3) return null;
+
+  /* Rate of change across EVERYTHING held — about eight days. peakKn describes
+     the strongest current this leg ever runs, so the divisor has to be the
+     strongest rate in that whole span, not just today's. Previously the day's
+     own maximum was mapped to peakKn every single day, which meant a weak neap
+     tide was reported at full spring strength. Slack TIMING was always right;
+     it was the rate that was inflated. */
   const der = [];
-  for(let i=1;i<win.length-1;i++){
-    const dtH = (win[i+1][0]-win[i-1][0])/36e5;
-    der.push([win[i][0] + offsetMin*6e4, (win[i+1][1]-win[i-1][1])/dtH]);
+  for(let i=1;i<pts.length-1;i++){
+    const dtH = (pts[i+1][0]-pts[i-1][0])/36e5;
+    der.push([pts[i][0] + offsetMin*6e4, (pts[i+1][1]-pts[i-1][1])/dtH]);
   }
   const scale = Math.max(...der.map(d=>Math.abs(d[1]))) || 1;
-  const out = der.map(([t,v]) => [t, v/scale*peakKn]);
+
+  const d0 = new Date(dayISO+"T00:00:00").getTime() - 36e5;
+  const d1 = d0 + 26*36e5;
+  const out = der.filter(d => d[0]>=d0 && d[0]<=d1)
+                 .map(([t,v]) => [t, v/scale*peakKn]);
+  if(out.length < 3) return null;
   out.station = key;
   out.substituted = key !== stationKey;
   return out;
@@ -1097,13 +1186,14 @@ function evaluate(routeKey, dayISO, windData, currents){
 
       if(hsOff && hsOff > hs*1.25){
         reasons.push({bad: bandOff === "red", t:
-          `Environment Canada forecasts up to ${OFF.maxKn} kn for ${esc(OFF.label)} and the model here `
+          `Environment Canada forecasts up to ${OFF.maxKn} kn for ${OFF.label} and the model here `
           + `only ${Math.round(w.wind)} kn. Scaled to the official figure this hour is `
           + `${Math.round(offWind)} kn and ${hsOff.toFixed(2)} m, not ${hs.toFixed(2)} m. `
           + `The verdict uses the worse of the two.`});
       }
       legs.push({name:leg.name, note:leg.note, wind:w.wind, gust:w.gust, from:w.from,
                  hs, tp, steep, blocked, cur, opposed, band, reasons,
+                 temp:w.temp, code:w.code, precip:w.precip, vis:w.vis, cape:w.cape,
                  hsOff, bandOff, offWind, offKn: OFF ? OFF.maxKn : null});
     });
     if(legs.length) hours.push({hh, ms, legs, band: legs.map(l=>l.band).reduce(worseOf,"green")});
@@ -1363,7 +1453,7 @@ function renderCheat(route, ev){
     const l = h.legs[legIdx];
     const set = l.cur >= 0 ? route.legs[legIdx].floodSet : (route.legs[legIdx].floodSet+180)%360;
     const e = eff(l);
-    return { hh:h.hh, from:l.wind_from ?? l.from, wind:e.wind, modelWind:l.wind,
+    return { hh:h.hh, from:l.from, wind:e.wind, modelWind:l.wind,
              scaled:e.scaled, cur:l.cur, set, opposed:l.opposed,
              blocked:l.blocked, band:h.band };
   });
@@ -1483,7 +1573,7 @@ function renderBulletin(ev){
     `<a href="${zonePage(z)}" target="_blank" rel="noopener">${esc(ZONES[z].name)} &#8599;</a>`).join(" &nbsp;·&nbsp; ");
 
   if(MANUAL_KN){
-    const warns = BULLETIN && BULLETIN.zones
+    const warns = BULLETIN && BULLETIN.zones && withinWarnHorizon(ev.day || "")
       ? zones.flatMap(z => (BULLETIN.zones[z]?.warnings||[]).map(w => `${ZONES[z].name}: ${w.title.replace(/, .*$/,"")}`))
       : [];
     return `<div class="bulletin warn">
@@ -1536,7 +1626,13 @@ function renderBulletin(ev){
 
   // Warnings, per zone
   const warned = zones.filter(z => BULLETIN.zones[z]?.warnings?.length);
-  if(warned.length){
+  const farOut = !withinWarnHorizon(ev.day || "");
+
+  /* Beyond 48 hours the warnings are not read, not listed, and not applied.
+     Repeating today's warning here would only invite it to be read as applying
+     to a day it says nothing about. A single plain message covers it instead —
+     see the farOut block further down. */
+  if(warned.length && !farOut){
     out += `<div class="bulletin warn">
       <span class="lbl">Warning in effect</span>
       ${warned.map(z => `
@@ -1576,6 +1672,21 @@ function renderBulletin(ev){
         <br><br>This still trusts the model's
         <em>timing</em>. If the ${off.maxKn} kn arrives at a different hour than the model expects,
         the shape is wrong — treat that figure as possible at any hour.</div></div>`;
+  }
+
+  if(farOut){
+    out += `<div class="bulletin warn">
+      <span class="lbl">Beyond 48 hours — warnings not accounted for</span>
+      <div class="w">Nothing shown for this date accounts for wind warnings. A warning describes
+        the next day or two only, so any in effect right now are deliberately <strong>not</strong>
+        being read or applied here.</div>
+      <div class="w">${off
+        ? `The forecast text above is still being used for the wind figure, but treat it as a
+           rough steer rather than a verdict.`
+        : `No official wind figure is being applied either, so the figures below are
+           <strong>model only</strong>, with nothing checking them.`}
+        Good for spotting a promising day; not something to commit to. Re-run it inside two days,
+        when the warning picture is real.</div></div>`;
   }
   return out;
 }
@@ -1732,6 +1843,84 @@ function initStationMap(route, ev, focusHH){
   setTimeout(()=>{ MAP.invalidateSize(); MAP.fitBounds(L.latLngBounds(pts).pad(0.06), {maxZoom:12}); }, 60);
 }
 
+/* WMO weather codes in plain English. Open-Meteo returns one for every leg and
+   hour; the engine was only using them to catch thunderstorms. */
+const WMO = {
+  0:"Clear", 1:"Mostly clear", 2:"Partly cloudy", 3:"Overcast",
+  45:"Fog", 48:"Freezing fog",
+  51:"Light drizzle", 53:"Drizzle", 55:"Heavy drizzle",
+  56:"Freezing drizzle", 57:"Freezing drizzle",
+  61:"Light rain", 63:"Rain", 65:"Heavy rain",
+  66:"Freezing rain", 67:"Freezing rain",
+  71:"Light snow", 73:"Snow", 75:"Heavy snow", 77:"Snow grains",
+  80:"Light showers", 81:"Showers", 82:"Heavy showers",
+  85:"Snow showers", 86:"Snow showers",
+  95:"Thunderstorm", 96:"Thunderstorm with hail", 99:"Thunderstorm with hail"
+};
+const wmoText = c => (c == null ? "—" : (WMO[c] || "Unsettled"));
+
+function renderWeather(ev, win){
+  const span = win
+    ? ev.hours.filter(h => h.hh >= win.depHH && h.hh <= win.retHH)
+    : ev.hours;
+  if(!span.length) return "";
+
+  const temps = [], viss = [], codeCount = {};
+  let precipTotal = 0;
+  span.forEach(h => h.legs.forEach(l => {
+    if(l.temp   != null) temps.push(l.temp);
+    if(l.vis    != null) viss.push(l.vis);
+    if(l.precip != null) precipTotal += l.precip;
+    if(l.code   != null) codeCount[l.code] = (codeCount[l.code]||0) + 1;
+  }));
+  if(!temps.length) return "";
+
+  const legCount = Math.max(1, ev.route.legs.length);
+  const avg = Math.round(temps.reduce((a,b)=>a+b,0)/temps.length);
+  const lo  = Math.round(Math.min(...temps));
+  const hi  = Math.round(Math.max(...temps));
+  const commonest = Object.entries(codeCount).sort((a,b)=>b[1]-a[1])[0];
+  const mainly = commonest ? wmoText(+commonest[0]) : "—";
+  const rain = precipTotal / legCount;           // per-leg total across the window
+  const minVis = viss.length ? Math.min(...viss) : null;
+  const showVis = v => v == null ? "—" : (v >= 10000 ? "10+ km" : (v/1000).toFixed(1)+" km");
+
+  const rows = span.filter((h,i) => i % 2 === 0).map(h => {
+    const l = h.legs[0];
+    return `<tr><td>${h.hh}</td>
+      <td>${l.temp != null ? Math.round(l.temp)+"&deg;" : "—"}</td>
+      <td style="font-family:var(--sans)">${esc(wmoText(l.code))}</td>
+      <td>${showVis(l.vis)}</td></tr>`;
+  }).join("");
+
+  const fogNote = (minVis != null && minVis < 5000)
+    ? `<div class="note ${minVis < 2000 ? "err" : "warn"}">Visibility drops to
+        <strong>${(minVis/1000).toFixed(1)} km</strong> in this window. You have no radar, and fog
+        is what most often catches an open boat out here.</div>`
+    : "";
+
+  const rainNote = rain >= 0.5
+    ? `<div class="note">About <strong>${rain.toFixed(1)} mm</strong> of rain across the window.
+        Wet, and it cuts your visibility further.</div>`
+    : "";
+
+  return `<h2>Weather ${win ? "while you're out" : "across the day"}</h2>
+    <div class="cheat"><div class="bands">
+      <div class="band"><div class="n">${avg}&deg;C</div>
+        <div class="w">Average air temp &mdash; ${lo}&deg; to ${hi}&deg;</div></div>
+      <div class="band"><div class="n" style="font:400 17px/1.2 var(--cond);letter-spacing:.03em">${esc(mainly)}</div>
+        <div class="w">Mostly</div></div>
+      <div class="band"><div class="n">${rain < 0.1 ? "Dry" : rain.toFixed(1)+" mm"}</div>
+        <div class="w">Rain</div></div>
+    </div></div>
+    <div class="scroll"><table>
+      <tr><th>Hr</th><th>Temp</th><th>Sky</th><th>Visibility</th></tr>${rows}</table></div>
+    ${fogNote}${rainNote}
+    <div class="note" style="color:var(--faint)">Air temperature, not water. The water here stays
+      around 10&ndash;12&deg;C all summer &mdash; dress for going in, not for sitting on the
+      deck.</div>`;
+}
+
 function renderLinks(route){
   /* Grouped by leg, so you know which station covers which patch of water,
      then the whole-trip forecasts and tide pages underneath. */
@@ -1781,11 +1970,18 @@ function render(ev, win, model){
     or see <em>If tides won't load</em> at the bottom of this page for a permanent fix.</div>`;
 
   if(win){
-    const unverified = !MANUAL_KN && !BULLETIN;
+    /* Unverified means nothing official is checking the model — either the
+       bulletin didn't load at all, or the day is past the range it covers. */
+    const unverified = !MANUAL_KN &&
+      (!BULLETIN || !officialForDay(ev.day || "", route.zones));
     h += `<h2>Your plan</h2>
       <div class="verdict ${win.verdict}${unverified?" unver":""}">
         <div class="word">${WORD[win.verdict]}${unverified?`<span class="unvtag">unverified</span>`:""}</div>
         <div class="detail">${pretty(win.depHH)} out, ${pretty(win.retHH)} back<br>
+          ${(win.askedDep && (win.askedDep.slice(3) !== "00" || win.askedRet.slice(3) !== "00"))
+            ? `<span style="color:var(--faint)">You asked for ${esc(win.askedDep)}&ndash;${esc(win.askedRet)}.
+               The forecast is hourly, so this is graded ${win.depHH}&ndash;${win.retHH} &mdash;
+               out early, back late, the longer day.</span><br>` : ""}
           ${win.tOut} min out · ${win.tBack} min back · about ${win.fuel} L (${win.fuelPct}% of tank)
           ${win.turnsBadAt?`<br><span class="b-red">Conditions turn bad at ${pretty(win.turnsBadAt)}, while you are out there.</span>`:""}
         </div></div>`;
@@ -1865,6 +2061,8 @@ function render(ev, win, model){
     h += `<h2>Legs at ${pretty(focusHH)}</h2>` + renderLegs(focus);
   }
 
+  h += renderWeather(ev, win);
+
   const first = route.legs[0];
   const _d = new Date(ev.hours[0].ms);
   const dayISO = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,"0")}-${String(_d.getDate()).padStart(2,"0")}`;
@@ -1903,7 +2101,14 @@ function render(ev, win, model){
   if(rb) rb.onclick = (e) => {
     e.preventDefault();
     rb.textContent = "fetching…";
-    try{ localStorage.removeItem("ec_bulletin"); }catch(err){}
+    /* Was: localStorage.removeItem("ec_bulletin") — wrong key, so this cleared
+       nothing and the refresh only worked because the stale flag re-fetched
+       anyway. Caching itself is deliberate and stays: weather.gc.ca is often
+       unreachable, and a stored bulletin with an age warning on it beats no
+       bulletin at all. */
+    try{
+      (ev.route.zones || ["haro"]).forEach(z => localStorage.removeItem("ec_bulletin_"+z));
+    }catch(err){}
     BULLETIN = null; BULLETIN_ERR = null;
     run();
   };
@@ -1927,6 +2132,17 @@ const $ = id => document.getElementById(id);
 function initRoutes(){
   $("route").innerHTML = Object.entries(ROUTES)
     .map(([k,r])=>`<option value="${k}">${esc(r.label)}</option>`).join("");
+
+  /* Times are dropdowns, not free entry. The forecast is hourly, so only :00
+     and :30 mean anything — offering 5:17 would just be a lie about the
+     resolution. Blank is still allowed: leave both and you get best windows. */
+  const slots = ['<option value="">&mdash;</option>'];
+  for(let h=5; h<=21; h++) for(const m of ["00","30"])
+    slots.push(`<option value="${String(h).padStart(2,"0")}:${m}">`
+      + `${((h+11)%12)+1}:${m} ${h<12?"am":"pm"}</option>`);
+  $("depart").innerHTML = slots.join("");
+  $("ret").innerHTML = slots.join("");
+
   const now = new Date();
   $("day").value = new Date(now.getTime()-now.getTimezoneOffset()*6e4).toISOString().slice(0,10);
 }
@@ -1961,8 +2177,15 @@ async function run(e){
       const dep = $("depart").value, ret = $("ret").value;
       let win = null;
       if(dep && ret && ret > dep){
-        const norm = t => t.slice(0,2)+":00";
-        win = evaluateWindow(ev, norm(dep), norm(ret));
+        /* The forecast is hourly, so a half-hour has to land on one. Round the
+           departure DOWN and the return UP — both toward the longer, more
+           exposed day. 5:30 back is graded against 6 pm, not 5. Was: norm()
+           truncated both, which quietly graded the wrong half of the return. */
+        const clamp = h => String(Math.max(5, Math.min(21, h))).padStart(2,"0")+":00";
+        const floorH = t => clamp(+t.slice(0,2));
+        const ceilH  = t => clamp(+t.slice(0,2) + (+t.slice(3,5) > 0 ? 1 : 0));
+        win = evaluateWindow(ev, floorH(dep), ceilH(ret));
+        if(win){ win.askedDep = dep; win.askedRet = ret; }
       }
       render(ev, win, wind.model);
       return true;
