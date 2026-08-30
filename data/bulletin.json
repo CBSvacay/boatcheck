@@ -1,6 +1,6 @@
 {
  "base_used": "https://dd.weather.gc.ca/20260830/WXO-DD/marine_weather/pacific",
- "generated": "2026-08-30T06:16:48.718065Z",
+ "generated": "2026-08-30T06:23:16.901295Z",
  "observations": {
   "discovery": {
    "code": "CWDR",
@@ -717,6 +717,12 @@
      "gust": 9.3,
      "kn": 4.3,
      "t": "2026-08-29T11:00:00.000Z"
+    },
+    {
+     "dir": 211,
+     "gust": 9.0,
+     "kn": 5.1,
+     "t": "2026-08-29T12:00:00.000Z"
     },
     {
      "dir": 216,
