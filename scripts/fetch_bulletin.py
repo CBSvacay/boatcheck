@@ -497,6 +497,12 @@ WANTED = {
 
 
 def probe_stations():
+    """
+    Columns are: IATA_ID, Name, WMO_ID, MSC_ID, Latitude, Longitude, ...
+    The first pass got the name column wrong and matched files on the word
+    "AUTO", which is in all 1153 filenames, so every station appeared to match
+    the same file. Match on the IATA code alone.
+    """
     import csv, io
     print()
     print("station observation probe (informational only)")
@@ -507,42 +513,78 @@ def probe_stations():
         print("  could not read the station list: %s" % e)
         return None
     rows = list(csv.reader(io.StringIO(raw)))
-    header = rows[0] if rows else []
-    print("  station list columns: %s" % ", ".join(h.strip() for h in header[:8]))
 
     found = {}
     for key, names in WANTED.items():
-        hit = None
         for r in rows[1:]:
-            joined = " ".join(r).upper()
-            if any(n in joined for n in names):
-                hit = r
-                break
-        if hit:
-            ids = [c.strip() for c in hit[:1] + hit[8:11] if c.strip()]
-            found[key] = {"row": hit, "ids": ids}
-            print("  %-10s FOUND — %s | ids: %s" % (key, hit[2].strip(), ", ".join(ids) or "none"))
-        else:
-            print("  %-10s not in the list" % key)
+            if len(r) < 6:
+                continue
+            name = r[1].strip().upper()
+            if any(n in name for n in names):
+                found.setdefault(key, []).append(r)
 
+    for key, hits in found.items():
+        for r in hits:
+            print("  %-10s %-6s %-34s %s, %s" % (
+                key, r[0].strip(), r[1].strip()[:34], r[4].strip(), r[5].strip()))
+    for key in WANTED:
+        if key not in found:
+            print("  %-10s not in the list" % key)
     if not found:
         return None
 
-    # Which of those ids actually has a file waiting in the latest folder?
     try:
-        listing_html = get(SWOB_LATEST).decode("utf-8", "replace")
+        files = set(re.findall(r'href="([^"]+-swob\.xml)"',
+                               get(SWOB_LATEST).decode("utf-8", "replace")))
     except Exception as e:
-        print("  could not read the latest observations folder: %s" % e)
+        print("  could not read the latest folder: %s" % e)
         return found
-    files = set(re.findall(r'href="([^"]+-swob\.xml)"', listing_html))
     print("  %d files in the latest folder" % len(files))
-    for key, info in found.items():
-        match = [f for f in files
-                 if any(i and i.upper() in f.upper() for i in info["ids"])]
-        print("  %-10s -> %s" % (key, match[0] if match else "no file matched its ids"))
-        if match:
-            info["file"] = match[0]
-    return found
+
+    live = {}
+    for key, hits in found.items():
+        for r in hits:
+            iata = r[0].strip().upper()
+            if not iata:
+                continue
+            match = [f for f in files if f.upper().startswith(iata + "-")]
+            if match:
+                pick = sorted(match, key=len)[0]     # plain hourly, not -minute-
+                live[key] = {"iata": iata, "name": r[1].strip(),
+                             "lat": r[4].strip(), "lon": r[5].strip(), "file": pick}
+                print("  %-10s %-6s -> %s" % (key, iata, pick))
+                break
+        else:
+            print("  %-10s -> no file for any of its codes" % key)
+
+    # Pull one and show its wind fields, so the data shape is known before
+    # anything is built on top of it.
+    for key in ("kelp", "saturna", "yyj"):
+        if key not in live:
+            continue
+        try:
+            xml = get(SWOB_LATEST + live[key]["file"])
+            root = ET.fromstring(xml)
+            wind = {}
+            for el in root.iter():
+                nm = el.get("name") or ""
+                if "wnd" in nm.lower() or "wind" in nm.lower():
+                    v = el.get("value")
+                    if v is not None:
+                        wind[nm] = v
+            when = ""
+            for el in root.iter():
+                if el.tag.endswith("timeStamp") or (el.get("name") == "date_tm"):
+                    when = el.get("value") or (el.text or "")
+                    if when:
+                        break
+            print("  sample %s (%s) at %s" % (key, live[key]["name"], when or "?"))
+            for k2 in sorted(wind)[:8]:
+                print("      %-28s %s" % (k2, wind[k2]))
+        except Exception as e:
+            print("  sample %s failed: %s" % (key, e))
+        break
+    return live
 
 
 if __name__ == "__main__":
