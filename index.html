@@ -821,12 +821,18 @@ function zoneFromRepo(repo, z){
   const genMs = Date.parse(repo.generated || "") || Date.now();
   const ageMin = Math.max(0, Math.round((Date.now() - genMs)/60000));
 
-  const issMs = Date.parse(zd.issued || "");
+  /* Freshness comes from when the file was PUBLISHED, taken from its own
+     filename, not from the lastModifiedTime field inside it. If Environment
+     Canada reissues a forecast whose wording hasn't changed, that field may
+     not move — and an unchanged forecast is still a current one. Judging by
+     it would condemn a perfectly good bulletin.
+
+     Scheduled issues are six hours apart (04, 10, 16, 22 UTC), so six hours
+     old is ordinary. Ten means a whole cycle was missed. */
+  const issMs = Date.parse(zd.published || zd.issued || "");
   const issuedAgeMin = isFinite(issMs)
     ? Math.max(0, Math.round((Date.now() - issMs)/60000)) : null;
-  // EC reissues roughly four times a day, so past eight hours something is
-  // wrong at the source rather than the weather simply being quiet.
-  const issuedStale = issuedAgeMin != null && issuedAgeMin > 480;
+  const issuedStale = issuedAgeMin != null && issuedAgeMin > 600;
 
   return {
     warnings: zd.warnings || [],
@@ -1747,8 +1753,9 @@ function renderBulletin(ev){
     out += `<div class="bulletin err">
       <span class="lbl">The forecast itself is out of date</span>
       <div class="w">The copy on this page was refreshed recently, but the bulletin inside it was
-        issued by Environment Canada <strong>${Math.max(...issuedOld)} hours ago</strong>.
-        They reissue about four times a day, so this one has been overtaken.</div>
+        published by Environment Canada <strong>${Math.max(...issuedOld)} hours ago</strong>.
+        They issue every six hours, so at least one scheduled issue has been missed &mdash;
+        either at their end or on the server this was fetched from.</div>
       <div class="w"><strong>Do not trust the verdicts below.</strong> Read the official forecast
         using a link on this page and type the wind into <em>Forecast wind</em>.</div></div>`;
   }
