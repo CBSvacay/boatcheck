@@ -30,9 +30,33 @@ import urllib.error
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
-BASE = "https://dd.weather.gc.ca/today/marine_weather/pacific"
-UA = {"User-Agent": "boatcheck/1.0 (+https://github.com/) marine bulletin fetcher"}
+# The datamart exposes the same tree several ways and the aliases are not
+# equally reliable. "/today/" is a convenience symlink that has been seen to
+# 404 while the dated path underneath it works fine, so every known layout is
+# tried in turn and whichever answers first wins.
+#
+# Dated paths are built for both today and yesterday UTC, because the rollover
+# happens mid-afternoon Pacific time and the new folder can be empty for a
+# while after it appears.
 TIMEOUT = 30
+UA = {"User-Agent": "Mozilla/5.0 (compatible; boatcheck/1.0; marine bulletin fetcher)",
+      "Accept": "*/*"}
+
+
+def candidate_bases():
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    days = [now.strftime("%Y%m%d"), (now - timedelta(days=1)).strftime("%Y%m%d")]
+    out = ["https://dd.weather.gc.ca/today/marine_weather/pacific",
+           "https://dd.meteo.gc.ca/today/marine_weather/pacific"]
+    for host in ("https://dd.weather.gc.ca", "https://dd.meteo.gc.ca",
+                 "https://hpfx.collab.science.gc.ca"):
+        for d in days:
+            out.append("%s/%s/WXO-DD/marine_weather/pacific" % (host, d))
+    return out
+
+
+BASE = None      # settled by hour_dirs() once a layout answers
 
 # Site codes come from https://dd.weather.gc.ca/today/marine_weather/regionList.xml
 #
@@ -55,16 +79,37 @@ def get(url):
 
 
 def hour_dirs():
-    """Newest hour folder first. Directory listing is plain Apache HTML."""
-    html = get(BASE + "/").decode("utf-8", "replace")
-    hours = sorted(set(re.findall(r'href="(\d{2})/"', html)), reverse=True)
-    if not hours:
-        raise RuntimeError("no hour folders found at " + BASE)
-    return hours
+    """
+    Find a working base and return its hour folders, newest first.
+
+    Every candidate is reported either way, so a future breakage shows up in
+    the log as a list of what was tried rather than a bare 404.
+    """
+    global BASE
+    tried = []
+    for base in candidate_bases():
+        try:
+            html = get(base + "/").decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            tried.append("%s -> HTTP %s" % (base, e.code));  continue
+        except Exception as e:
+            tried.append("%s -> %s" % (base, e));            continue
+        hours = sorted(set(re.findall(r'href="(\d{2})/"', html)), reverse=True)
+        if hours:
+            BASE = base
+            print("using %s" % base)
+            return hours
+        tried.append("%s -> listing had no hour folders" % base)
+    raise RuntimeError("no working datamart path. Tried:\n  " + "\n  ".join(tried))
 
 
 def find_file(hours, code):
-    """Walk back from the newest hour until this site code turns up."""
+    """
+    Walk back from the newest hour until this site code turns up.
+
+    Older folders are kept as fallbacks rather than insisting on the newest,
+    because a folder can exist before every region has been written into it.
+    """
     for hh in hours:
         try:
             html = get("%s/%s/" % (BASE, hh)).decode("utf-8", "replace")
@@ -232,7 +277,11 @@ def build_zone(key, spec, hours):
 
 
 def main():
-    hours = hour_dirs()
+    try:
+        hours = hour_dirs()
+    except Exception as e:
+        print(e, file=sys.stderr)
+        return 1
     print("hour folders available:", ", ".join(hours))
 
     zones, failed = {}, {}
