@@ -558,6 +558,12 @@ def parse_swob(xml):
             "dir": int(dr) if dr is not None else None}
 
 
+def names_only(pairs):
+    """names is a list of (base, filename); this just makes the intent obvious
+    at the call site."""
+    return [(b, n) for (b, n) in pairs]
+
+
 def fetch_observations(previous):
     """
     Hourly wind for each station, today and yesterday UTC.
@@ -586,11 +592,30 @@ def fetch_observations(previous):
                     break
                 except Exception:
                     continue
-            for base, n in sorted(names):
-                m = re.match(r"(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})", n)
+            # One file per hour, and only per hour.
+            #
+            # Race Rocks publishes every few minutes: 351 files in a day
+            # against 30 from Kelp Reefs. Downloading all of them took three
+            # minutes and gained nothing, because the forecast this gets
+            # compared against is hourly. Pick the file nearest each o'clock
+            # and skip the rest, decided on filenames before anything is
+            # downloaded.
+            per_hour = {}
+            for n in names_only(names):
+                m = re.match(r"(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})", n[1])
                 if not m:
                     continue
-                stamp = "%s-%s-%sT%s:%s:00.000Z" % m.groups()
+                y, mo, d, hh, mi = m.groups()
+                key_h = y + mo + d + hh
+                # distance from the top of the hour, wrapping so :55 counts as 5
+                off = min(int(mi), 60 - int(mi))
+                if key_h not in per_hour or off < per_hour[key_h][0]:
+                    per_hour[key_h] = (off, n)
+
+            for _, (base, n) in sorted(per_hour.values(), key=lambda x: x[1][1]):
+                m = re.match(r"(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})", n)
+                y, mo, d, hh, mi = m.groups()
+                stamp = "%s-%s-%sT%s:00:00.000Z" % (y, mo, d, hh)
                 if stamp < cutoff or stamp in have:
                     continue
                 try:
@@ -598,7 +623,10 @@ def fetch_observations(previous):
                 except Exception:
                     continue
                 if rec:
-                    have[rec["t"]] = rec
+                    # File its own time, but key it to the hour so a later run
+                    # doesn't fetch a second copy of the same hour.
+                    rec["t"] = stamp
+                    have[stamp] = rec
                     added += 1
         if have:
             out[key] = {"code": st["code"], "name": st["name"],
