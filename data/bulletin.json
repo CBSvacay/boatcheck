@@ -1,0 +1,62 @@
+{
+ "generated": "2026-08-30T03:38:05.770630Z",
+ "zones": {
+  "haro": {
+   "area": "Haro Strait",
+   "extended": {
+    "text": "Monday: Wind light becoming southwest 5 to 10 knots in the afternoon. Tuesday: Wind light becoming southwest 5 to 15 knots. Wednesday: Wind southeast 15 to 25 knots increasing to southeast 25 to 35."
+   },
+   "forecast": {
+    "text": "Tonight and Sunday.: Wind southwest 5 to 15 knots except southwest 20 over southern sections. Wind becoming southeast 5 to 15 Sunday morning then becoming light Sunday evening."
+   },
+   "issued": null,
+   "label": "Haro Strait",
+   "notes": "",
+   "source": "https://hpfx.collab.science.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225956.735Z_MSC_MarineWeather_m0000064_en.xml",
+   "warnings": [
+    {
+     "cat": "marine",
+     "text": "Strong wind warning",
+     "title": "Strong wind warning"
+    }
+   ],
+   "waves": ""
+  },
+  "jdf": {
+   "area": "Juan de Fuca Strait - east entrance",
+   "extended": {
+    "text": "Monday: Wind west 5 to 15 knots becoming light in the morning then becoming west 5 to 15 late in the day. Tuesday: Wind west 5 to 15 knots diminishing to light. Wednesday: Wind light increasing to southeast 20 to 30 knots."
+   },
+   "forecast": {
+    "text": "Tonight and Sunday.: Wind westerly 20 to 25 knots diminishing to westerly 15 to 20 after midnight and to westerly 5 to 15 early Sunday morning."
+   },
+   "issued": null,
+   "label": "Juan de Fuca Strait — east entrance",
+   "notes": "",
+   "source": "https://hpfx.collab.science.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225946.758Z_MSC_MarineWeather_m0000009_en.xml",
+   "warnings": [
+    {
+     "cat": "marine",
+     "text": "Strong wind warning",
+     "title": "Strong wind warning"
+    }
+   ],
+   "waves": ""
+  },
+  "sog": {
+   "area": "Strait of Georgia - south of Nanaimo",
+   "extended": {
+    "text": "Monday: Wind variable 5 to 15 knots becoming northwest 5 to 15 late in the day. Tuesday: Wind variable 5 to 15 knots becoming southeast 10 to 20. Wednesday: Wind southeast 15 to 25 knots increasing to southeast 25 to 35."
+   },
+   "forecast": {
+    "text": "Tonight and Sunday.: Wind northwest 10 to 15 knots diminishing to light early this evening then becoming southeast 5 to 15 early Sunday morning. Wind becoming light Sunday evening. Showers Sunday."
+   },
+   "issued": null,
+   "label": "Strait of Georgia — south of Nanaimo",
+   "notes": "",
+   "source": "https://hpfx.collab.science.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225936.738Z_MSC_MarineWeather_m0000028_en.xml",
+   "warnings": [],
+   "waves": ""
+  }
+ }
+}
