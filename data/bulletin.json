@@ -1,6 +1,6 @@
 {
  "base_used": "https://dd.weather.gc.ca/20260829/WXO-DD/marine_weather/pacific",
- "generated": "2026-08-30T03:55:21.534859Z",
+ "generated": "2026-08-30T04:03:31.544094Z",
  "zones": {
   "haro": {
    "area": "Haro Strait",
@@ -10,9 +10,10 @@
    "forecast": {
     "text": "Tonight and Sunday.: Wind southwest 5 to 15 knots except southwest 20 over southern sections. Wind becoming southeast 5 to 15 Sunday morning then becoming light Sunday evening."
    },
-   "issued": null,
+   "issued": "2026-08-29T23:00:00Z",
    "label": "Haro Strait",
    "notes": "",
+   "published": "2026-08-29T22:59:56Z",
    "source": "https://dd.weather.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225956.735Z_MSC_MarineWeather_m0000064_en.xml",
    "warnings": [
     {
@@ -31,9 +32,10 @@
    "forecast": {
     "text": "Tonight and Sunday.: Wind westerly 20 to 25 knots diminishing to westerly 15 to 20 after midnight and to westerly 5 to 15 early Sunday morning."
    },
-   "issued": null,
+   "issued": "2026-08-29T23:00:00Z",
    "label": "Juan de Fuca Strait — east entrance",
    "notes": "",
+   "published": "2026-08-29T22:59:46Z",
    "source": "https://dd.weather.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225946.758Z_MSC_MarineWeather_m0000009_en.xml",
    "warnings": [
     {
@@ -52,9 +54,10 @@
    "forecast": {
     "text": "Tonight and Sunday.: Wind northwest 10 to 15 knots diminishing to light early this evening then becoming southeast 5 to 15 early Sunday morning. Wind becoming light Sunday evening. Showers Sunday."
    },
-   "issued": null,
+   "issued": "2026-08-29T23:00:00Z",
    "label": "Strait of Georgia — south of Nanaimo",
    "notes": "",
+   "published": "2026-08-29T22:59:36Z",
    "source": "https://dd.weather.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225936.738Z_MSC_MarineWeather_m0000028_en.xml",
    "warnings": [],
    "waves": ""
