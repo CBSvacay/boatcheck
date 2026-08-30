@@ -462,9 +462,21 @@ def main():
     print("wrote data/bulletin.json with %d zone(s)" % len(zones))
 
     try:
-        probe_stations()
+        prev = {}
+        try:
+            with open("data/bulletin.json", encoding="utf-8") as f:
+                prev = json.load(f).get("observations", {}) or {}
+        except Exception:
+            pass
+        print()
+        print("station observations (km/h at source, stored as knots)")
+        obs = fetch_observations(prev)
+        if obs:
+            out["observations"] = obs
+            with open("data/bulletin.json", "w", encoding="utf-8") as f:
+                json.dump(out, f, ensure_ascii=False, indent=1, sort_keys=True)
     except Exception as e:
-        print("station probe failed (harmless): %s" % e)
+        print("observations failed (bulletin unaffected): %s" % e)
     return 0
 
 
@@ -502,61 +514,102 @@ STATIONS = {
 
 
 
-def probe_stations():
-    """
-    Second pass. Codes are pinned now, so this checks three things:
-    what the wind SPEED fields are called and what units they use, and whether
-    a day of history is reachable — a comparison needs the whole day, not just
-    the latest reading.
-    """
-    print()
-    print("station observation probe (informational only)")
+KMH_TO_KN = 1.0/1.852
+OBS_KEEP_H = 36          # enough to cover a full local day either side of UTC midnight
 
-    try:
-        files = set(re.findall(r'href="([^"]+-swob\.xml)"',
-                               get(SWOB_LATEST).decode("utf-8", "replace")))
-    except Exception as e:
-        print("  latest folder unreadable: %s" % e)
+
+def obs_dirs(day, code):
+    return ["https://dd.weather.gc.ca/today/observations/swob-ml/%s/%s/" % (day, code),
+            "https://dd.weather.gc.ca/%s/WXO-DD/observations/swob-ml/%s/%s/" % (day, day, code)]
+
+
+def parse_swob(xml):
+    """
+    One hourly observation. Speeds are published in KM/H — reading them as
+    knots would overstate every figure by a factor of 1.85, so the conversion
+    is not optional.
+    """
+    root = ET.fromstring(xml)
+    vals = {}
+    for el in root.iter():
+        nm = el.get("name")
+        if nm and el.get("value") is not None:
+            vals[nm] = el.get("value")
+
+    def num(*names):
+        for n in names:
+            try:
+                return float(vals[n])
+            except (KeyError, ValueError, TypeError):
+                continue
         return None
 
-    live = {}
+    # Hourly average is the like-for-like match for an hourly forecast; the
+    # 10-minute average stands in when it is missing.
+    spd = num("avg_wnd_spd_10m_pst1hr", "avg_wnd_spd_10m_pst10mts", "avg_wnd_spd_10m_pst2mts")
+    gst = num("max_wnd_spd_10m_pst1hr", "max_wnd_spd_10m_pst10mts")
+    dr  = num("avg_wnd_dir_10m_pst1hr", "avg_wnd_dir_10m_pst10mts", "avg_wnd_dir_10m_pst2mts")
+    when = vals.get("date_tm")
+    if not when or spd is None:
+        return None
+    return {"t": when,
+            "kn": round(spd*KMH_TO_KN, 1),
+            "gust": round(gst*KMH_TO_KN, 1) if gst is not None else None,
+            "dir": int(dr) if dr is not None else None}
+
+
+def fetch_observations(previous):
+    """
+    Hourly wind for each station, today and yesterday UTC.
+
+    Only files we don't already hold are downloaded, so the first run
+    backfills and later ones fetch an hour or two. That keeps this to a
+    handful of requests instead of ~180 every hour.
+    """
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    days = [(now - timedelta(days=1)).strftime("%Y%m%d"), now.strftime("%Y%m%d")]
+    cutoff = (now - timedelta(hours=OBS_KEEP_H)).isoformat().replace("+00:00", "Z")
+
+    out = {}
     for key, st in STATIONS.items():
-        match = sorted([f for f in files if f.upper().startswith(st["code"] + "-")], key=len)
-        if match:
-            live[key] = match[0]
-            print("  %-10s %-5s %-18s -> %s" % (key, st["code"], st["name"], match[0]))
+        have = {r["t"]: r for r in (previous.get(key, {}) or {}).get("readings", [])
+                if r.get("t", "") >= cutoff}
+        added = 0
+        for day in days:
+            names = []
+            for base in obs_dirs(day, st["code"]):
+                try:
+                    names = [(base, n) for n in re.findall(
+                        r'href="([^"]+-swob\.xml)"',
+                        listing(base))]
+                    break
+                except Exception:
+                    continue
+            for base, n in sorted(names):
+                m = re.match(r"(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})", n)
+                if not m:
+                    continue
+                stamp = "%s-%s-%sT%s:%s:00.000Z" % m.groups()
+                if stamp < cutoff or stamp in have:
+                    continue
+                try:
+                    rec = parse_swob(get(base + n))
+                except Exception:
+                    continue
+                if rec:
+                    have[rec["t"]] = rec
+                    added += 1
+        if have:
+            out[key] = {"code": st["code"], "name": st["name"],
+                        "lat": st["lat"], "lon": st["lon"],
+                        "readings": sorted(have.values(), key=lambda r: r["t"])}
+            last = out[key]["readings"][-1]
+            print("  %-10s %-18s %d readings (+%d new), latest %s  %.1f kn" % (
+                key, st["name"], len(have), added, last["t"][11:16], last["kn"]))
         else:
-            print("  %-10s %-5s %-18s -> no file" % (key, st["code"], st["name"]))
-
-    # Every wind field with its unit, so nothing has to be assumed later.
-    if "kelp" in live:
-        try:
-            root = ET.fromstring(get(SWOB_LATEST + live["kelp"]))
-            print("  Kelp Reefs wind fields:")
-            for el in root.iter():
-                nm = (el.get("name") or "")
-                if "wnd" in nm.lower() and el.get("value") is not None:
-                    print("      %-30s %-8s %s" % (nm, el.get("value"), el.get("uom") or "?"))
-            for el in root.iter():
-                if (el.get("name") or "") in ("date_tm", "stn_nam"):
-                    print("      %-30s %s" % (el.get("name"), el.get("value")))
-        except Exception as e:
-            print("  kelp sample failed: %s" % e)
-
-    # Is a day of history reachable, and under what path?
-    day = datetime.now(timezone.utc).strftime("%Y%m%d")
-    for base in ("https://dd.weather.gc.ca/today/observations/swob-ml/%s/CWZO/" % day,
-                 "https://dd.weather.gc.ca/%s/WXO-DD/observations/swob-ml/%s/CWZO/" % (day, day)):
-        try:
-            hist = re.findall(r'href="([^"]+-swob\.xml)"', get(base).decode("utf-8", "replace"))
-            print("  history: %d files at %s" % (len(hist), base))
-            if hist:
-                print("      earliest %s" % sorted(hist)[0])
-                print("      latest   %s" % sorted(hist)[-1])
-            break
-        except Exception as e:
-            print("  history: %s -> %s" % (base, e))
-    return live
+            print("  %-10s %-18s no readings" % (key, st["name"]))
+    return out
 
 
 if __name__ == "__main__":
