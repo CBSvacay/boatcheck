@@ -486,104 +486,76 @@ STATION_LIST = "https://dd.weather.gc.ca/today/observations/doc/swob-xml_station
 SWOB_LATEST = "https://dd.weather.gc.ca/today/observations/swob-ml/latest/"
 
 # Names as they appear on weather.gc.ca, and the leg each one covers.
-WANTED = {
-    "kelp":      ["KELP REEFS"],
-    "saturna":   ["SATURNA", "EAST POINT"],
-    "discovery": ["DISCOVERY ISLAND"],
-    "racerocks": ["RACE ROCKS"],
-    "esquimalt": ["ESQUIMALT"],
-    "yyj":       ["VICTORIA INT"],
+# Pinned by station code, not by name. Name matching found three candidates
+# for Saturna and picked the wrong one: CVTS is an air-quality site inland,
+# and "EAST POINT (AUT)" is in Nova Scotia. CWEZ is the East Point lightstation
+# this app actually links to. Coordinates below are from the station list and
+# match the ones already in LINKS.
+STATIONS = {
+    "kelp":      {"code": "CWZO", "name": "Kelp Reefs",          "lat": 48.5476, "lon": -123.2369},
+    "saturna":   {"code": "CWEZ", "name": "Saturna Island",      "lat": 48.7832, "lon": -123.0458},
+    "discovery": {"code": "CWDR", "name": "Discovery Island",    "lat": 48.4246, "lon": -123.2258},
+    "racerocks": {"code": "CWQK", "name": "Race Rocks",          "lat": 48.2980, "lon": -123.5314},
+    "esquimalt": {"code": "CWPF", "name": "Esquimalt Harbour",   "lat": 48.4320, "lon": -123.4393},
+    "yyj":       {"code": "CYYJ", "name": "Victoria Int'l",      "lat": 48.6472, "lon": -123.4260},
 }
+
 
 
 def probe_stations():
     """
-    Columns are: IATA_ID, Name, WMO_ID, MSC_ID, Latitude, Longitude, ...
-    The first pass got the name column wrong and matched files on the word
-    "AUTO", which is in all 1153 filenames, so every station appeared to match
-    the same file. Match on the IATA code alone.
+    Second pass. Codes are pinned now, so this checks three things:
+    what the wind SPEED fields are called and what units they use, and whether
+    a day of history is reachable — a comparison needs the whole day, not just
+    the latest reading.
     """
-    import csv, io
     print()
     print("station observation probe (informational only)")
-
-    try:
-        raw = get(STATION_LIST).decode("utf-8", "replace")
-    except Exception as e:
-        print("  could not read the station list: %s" % e)
-        return None
-    rows = list(csv.reader(io.StringIO(raw)))
-
-    found = {}
-    for key, names in WANTED.items():
-        for r in rows[1:]:
-            if len(r) < 6:
-                continue
-            name = r[1].strip().upper()
-            if any(n in name for n in names):
-                found.setdefault(key, []).append(r)
-
-    for key, hits in found.items():
-        for r in hits:
-            print("  %-10s %-6s %-34s %s, %s" % (
-                key, r[0].strip(), r[1].strip()[:34], r[4].strip(), r[5].strip()))
-    for key in WANTED:
-        if key not in found:
-            print("  %-10s not in the list" % key)
-    if not found:
-        return None
 
     try:
         files = set(re.findall(r'href="([^"]+-swob\.xml)"',
                                get(SWOB_LATEST).decode("utf-8", "replace")))
     except Exception as e:
-        print("  could not read the latest folder: %s" % e)
-        return found
-    print("  %d files in the latest folder" % len(files))
+        print("  latest folder unreadable: %s" % e)
+        return None
 
     live = {}
-    for key, hits in found.items():
-        for r in hits:
-            iata = r[0].strip().upper()
-            if not iata:
-                continue
-            match = [f for f in files if f.upper().startswith(iata + "-")]
-            if match:
-                pick = sorted(match, key=len)[0]     # plain hourly, not -minute-
-                live[key] = {"iata": iata, "name": r[1].strip(),
-                             "lat": r[4].strip(), "lon": r[5].strip(), "file": pick}
-                print("  %-10s %-6s -> %s" % (key, iata, pick))
-                break
+    for key, st in STATIONS.items():
+        match = sorted([f for f in files if f.upper().startswith(st["code"] + "-")], key=len)
+        if match:
+            live[key] = match[0]
+            print("  %-10s %-5s %-18s -> %s" % (key, st["code"], st["name"], match[0]))
         else:
-            print("  %-10s -> no file for any of its codes" % key)
+            print("  %-10s %-5s %-18s -> no file" % (key, st["code"], st["name"]))
 
-    # Pull one and show its wind fields, so the data shape is known before
-    # anything is built on top of it.
-    for key in ("kelp", "saturna", "yyj"):
-        if key not in live:
-            continue
+    # Every wind field with its unit, so nothing has to be assumed later.
+    if "kelp" in live:
         try:
-            xml = get(SWOB_LATEST + live[key]["file"])
-            root = ET.fromstring(xml)
-            wind = {}
+            root = ET.fromstring(get(SWOB_LATEST + live["kelp"]))
+            print("  Kelp Reefs wind fields:")
             for el in root.iter():
-                nm = el.get("name") or ""
-                if "wnd" in nm.lower() or "wind" in nm.lower():
-                    v = el.get("value")
-                    if v is not None:
-                        wind[nm] = v
-            when = ""
+                nm = (el.get("name") or "")
+                if "wnd" in nm.lower() and el.get("value") is not None:
+                    print("      %-30s %-8s %s" % (nm, el.get("value"), el.get("uom") or "?"))
             for el in root.iter():
-                if el.tag.endswith("timeStamp") or (el.get("name") == "date_tm"):
-                    when = el.get("value") or (el.text or "")
-                    if when:
-                        break
-            print("  sample %s (%s) at %s" % (key, live[key]["name"], when or "?"))
-            for k2 in sorted(wind)[:8]:
-                print("      %-28s %s" % (k2, wind[k2]))
+                if (el.get("name") or "") in ("date_tm", "stn_nam"):
+                    print("      %-30s %s" % (el.get("name"), el.get("value")))
         except Exception as e:
-            print("  sample %s failed: %s" % (key, e))
-        break
+            print("  kelp sample failed: %s" % e)
+
+    # Is a day of history reachable, and under what path?
+    day = datetime.now(timezone.utc).strftime("%Y%m%d")
+    for base in ("https://dd.weather.gc.ca/today/observations/swob-ml/%s/CWZO/" % day,
+                 "https://dd.weather.gc.ca/%s/WXO-DD/observations/swob-ml/%s/CWZO/" % (day, day)):
+        try:
+            hist = re.findall(r'href="([^"]+-swob\.xml)"', get(base).decode("utf-8", "replace"))
+            print("  history: %d files at %s" % (len(hist), base))
+            if hist:
+                print("      earliest %s" % sorted(hist)[0])
+                print("      latest   %s" % sorted(hist)[-1])
+            break
+        except Exception as e:
+            print("  history: %s -> %s" % (base, e))
     return live
 
 
