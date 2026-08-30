@@ -378,6 +378,32 @@ wind-against-current test.</li>
 any default here.</p>
 </div></details>
 
+<details class="about"><summary>Where the forecast comes from</summary><div class="body">
+<p>Environment Canada retired the marine feed this page used to read. The bulletins are
+still published, but on the <strong>MSC Datamart</strong> &mdash; a server built for programs
+rather than browsers. Two things make that awkward to read from a phone: the files sit in
+folders named by the hour and those folders are deleted as the day rolls over, and a browser
+may refuse to read another site's data at all.</p>
+<p>So a scheduled job fetches it instead. <code>scripts/fetch_bulletin.py</code> runs hourly on
+GitHub, pulls Haro Strait, Juan de Fuca and Strait of Georgia, and commits
+<code>data/bulletin.json</code> into this repo. The page reads that from its own address, where
+nothing can block it.</p>
+<p>The old relay chain is still in the file as a fallback, for a fresh clone where the job
+hasn't run yet. If the stored copy goes more than about seven hours old, the page tries the
+relays again before trusting it.</p>
+<p><strong>Two things the fetcher does deliberately:</strong></p>
+<ul>
+<li>It picks the <em>sub-area</em> you actually boat in. The Juan de Fuca file covers both
+entrances; taking the wrong one could hand you the west entrance's 35 knots on a day the east
+entrance is doing 15.</li>
+<li>It leaves <strong>air temperature out</strong> of the forecast text. The page reads every
+number in that text as a wind speed, so &ldquo;air temperature 22&rdquo; would be read as 22
+knots and could turn a fine day red. Temperature is stored separately.</li>
+</ul>
+<p>If the job stops running, the page keeps working and shows you how old the stored copy is.
+The <em>Forecast wind</em> box remains the manual override throughout.</p>
+</div></details>
+
 <details class="about"><summary>If tides won't load</summary><div class="body">
 <p>The page asks the Canadian Hydrographic Service for tides directly. Some browsers block that
 (CHS doesn't send the header that permits it). If you see the "tides unavailable" warning
@@ -727,6 +753,7 @@ const worseOf = (a,b) => ({green:0,yellow:1,red:2}[a] >= {green:0,yellow:1,red:2
 let TIDES = null, TIDE_ERR = null, TIDE_SRC = null;
 let BULLETIN = null, BULLETIN_ERR = null, BULLETIN_PENDING = false, RUN_TOKEN = 0;
 let FORCE_BULLETIN = false;   // set by "Try again now"; never deletes the cache
+let FETCH_ERR = null;         // last fetch failure, kept even when a cached copy is used
 let MANUAL_KN = null;   // wind the user typed from the official bulletin
 
 /* Environment Canada marine zones. There is no "Gulf Islands" zone — Haro
@@ -751,6 +778,68 @@ const EC_PAGE = zonePage("haro");
    page says so loudly rather than pretending everything is fine. */
 const BULLETIN_TTL_MIN = 15;      // refresh in the background past this
 const BULLETIN_STALE_MIN = 720;   // 12 h — still far better than no forecast
+
+/* The bulletin committed into this repo by the hourly GitHub Action. This is
+   the reliable path: it comes from our own address, so nothing can block it
+   and no relay is involved. The relay chain below is now only a fallback for
+   when the Action hasn't been set up or hasn't run yet.
+
+   Environment Canada retired the marine feed at weather.gc.ca/rss/marine/,
+   which is why the relays started returning "bad XML" — they were fetching an
+   error page. See scripts/fetch_bulletin.py. */
+const REPO_BULLETIN_URL = "data/bulletin.json";
+const REPO_TTL_MIN = 100;    // hourly job plus slack for GitHub's scheduler
+let REPO_BULLETIN;           // undefined = not tried yet, null = not available
+
+async function repoBulletin(){
+  if(REPO_BULLETIN !== undefined) return REPO_BULLETIN;
+  try{
+    const r = await fetch(REPO_BULLETIN_URL, {cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const j = await r.json();
+    if(!j || !j.zones || !Object.keys(j.zones).length) throw new Error("no zones");
+    REPO_BULLETIN = j;
+  }catch(e){
+    REPO_BULLETIN = null;
+  }
+  return REPO_BULLETIN;
+}
+
+/* Shape a stored zone to look exactly like a parsed feed entry, so everything
+   downstream is unchanged. */
+function zoneFromRepo(repo, z){
+  const zd = repo.zones[z];
+  if(!zd) return null;
+
+  /* Two different ages, and conflating them would be dangerous.
+
+     ageMin is how long since the job last ran — that governs refreshing.
+     issuedAgeMin is how long since Environment Canada actually issued the
+     bulletin. A job running every hour against a server that has fallen
+     behind produces a copy that is minutes old and contains a forecast from
+     yesterday. Reporting only the first would call that fresh. */
+  const genMs = Date.parse(repo.generated || "") || Date.now();
+  const ageMin = Math.max(0, Math.round((Date.now() - genMs)/60000));
+
+  const issMs = Date.parse(zd.issued || "");
+  const issuedAgeMin = isFinite(issMs)
+    ? Math.max(0, Math.round((Date.now() - issMs)/60000)) : null;
+  // EC reissues roughly four times a day, so past eight hours something is
+  // wrong at the source rather than the weather simply being quiet.
+  const issuedStale = issuedAgeMin != null && issuedAgeMin > 480;
+
+  return {
+    warnings: zd.warnings || [],
+    forecast: zd.forecast || null,
+    extended: zd.extended || null,
+    waves: zd.waves || "",
+    notes: zd.notes || "",
+    fromRepo: true,
+    src: "refreshed hourly into this repo",
+    issuedAgeMin, issuedStale,
+    ageMin, stale: ageMin > REPO_TTL_MIN, veryStale: ageMin > 4*REPO_TTL_MIN
+  };
+}
 
 function parseAtom(xmlText){
   const xml = new DOMParser().parseFromString(xmlText, "application/xml");
@@ -778,7 +867,9 @@ function cachedZone(zone){
     const ageMin = (Date.now() - c.at)/60000;
     if(ageMin > BULLETIN_STALE_MIN) return null;
     c.data.ageMin = Math.round(ageMin);
-    c.data.stale = ageMin > BULLETIN_TTL_MIN;
+    /* A repo copy is refreshed hourly by design, so judging it against the
+       15-minute relay TTL would flag it as stale almost all the time. */
+    c.data.stale = ageMin > (c.data.fromRepo ? REPO_TTL_MIN : BULLETIN_TTL_MIN);
     c.data.veryStale = ageMin > 180;
     return c.data;
   }catch(e){ return null; }
@@ -807,6 +898,15 @@ async function fetchZone(zone){
       const b = parseAtom(await r.text());
       b.src = label === "direct" ? "live from Environment Canada" : "live, " + label;
       return b;
+    } catch(e){
+      /* Attach the source name to the failure. Without this the panel reported
+         a bare "Failed to fetch" from whichever route happened to be first,
+         which said nothing about whether the feed, the relays, or the network
+         was at fault. */
+      throw new Error(label + " — " + (
+        e.name === "AbortError" ? "timed out" :
+        /failed to fetch|networkerror|load failed/i.test(e.message) ? "blocked or unreachable" :
+        e.message));
     } finally { clearTimeout(timer); }
   };
   const b = await Promise.any(routes.map(attempt));
@@ -817,12 +917,29 @@ async function fetchZone(zone){
 /* Load every zone a route touches. A failure for one zone keeps whatever was
    cached for it rather than discarding it. */
 async function loadBulletins(zones){
+  FETCH_ERR = null;
+  const repo = await repoBulletin();
   const results = await Promise.all(zones.map(async z => {
+    /* Repo copy first. Only reach for the relays when it has nothing for this
+       zone, or what it has has gone properly stale. */
+    const fromRepo = repo ? zoneFromRepo(repo, z) : null;
+    if(fromRepo && !fromRepo.veryStale){
+      try{ localStorage.setItem("ec_bulletin_"+z,
+        JSON.stringify({at: Date.now() - fromRepo.ageMin*60000, data: fromRepo})); }catch(e){}
+      return [z, fromRepo];
+    }
     try { return [z, await fetchZone(z)]; }
     catch(agg){
-      const first = agg && agg.errors && agg.errors[0];
-      const msg = first ? (first.name === "AbortError" ? "timed out" : first.message) : "unavailable";
-      const fb = cachedZone(z);
+      /* Promise.any rejects with an AggregateError holding every failure. Show
+         them all — one line per source — so a diagnosis is possible without
+         opening the developer console on a phone. */
+      const errs = (agg && agg.errors && agg.errors.length) ? agg.errors : [agg];
+      const msg = errs.map(e => e && e.message).filter(Boolean).join(" · ") || "unavailable";
+      /* Kept separately from BULLETIN_ERR, which gets cleared as soon as any
+         zone resolves from cache. Otherwise a successful fallback would hide
+         the very error needed to work out why the fetch keeps failing. */
+      FETCH_ERR = msg;
+      const fb = cachedZone(z) || (repo ? zoneFromRepo(repo, z) : null);
       if(!fb) BULLETIN_ERR = msg;
       return [z, fb];
     }
@@ -1621,13 +1738,30 @@ function renderBulletin(ev){
   const anyStale = zones.some(z => BULLETIN.zones[z]?.stale);
   const veryStale = zones.some(z => BULLETIN.zones[z]?.veryStale);
 
+  /* The stored copy can be minutes old and still hold an out-of-date bulletin
+     if the server it came from is lagging. Say so plainly. */
+  const issuedOld = zones.map(z => BULLETIN.zones[z])
+    .filter(zd => zd && zd.issuedStale)
+    .map(zd => Math.round(zd.issuedAgeMin/60));
+  if(issuedOld.length){
+    out += `<div class="bulletin err">
+      <span class="lbl">The forecast itself is out of date</span>
+      <div class="w">The copy on this page was refreshed recently, but the bulletin inside it was
+        issued by Environment Canada <strong>${Math.max(...issuedOld)} hours ago</strong>.
+        They reissue about four times a day, so this one has been overtaken.</div>
+      <div class="w"><strong>Do not trust the verdicts below.</strong> Read the official forecast
+        using a link on this page and type the wind into <em>Forecast wind</em>.</div></div>`;
+  }
+
   if(anyStale){
     const age = oldest < 90 ? oldest+" minutes" : (oldest/60).toFixed(1)+" hours";
     out += `<div class="bulletin ${veryStale?"err":"warn"}">
       <span class="lbl">This bulletin is ${age} old</span>
       <div class="w">A fresh copy was requested and did not arrive, so the stored one is being used.
         Environment Canada reissues about four times a day plus amendments, so a warning may have been
-        added or lifted since. <a href="#" id="refreshbul">Try again now</a></div></div>`;
+        added or lifted since. <a href="#" id="refreshbul">Try again now</a></div>
+      ${FETCH_ERR ? `<div class="w" style="color:var(--faint);font-size:13px">
+        Why the refresh failed: ${esc(FETCH_ERR)}</div>` : ""}</div>`;
   }
 
   // Warnings, per zone
