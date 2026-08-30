@@ -1,5 +1,6 @@
 {
- "generated": "2026-08-30T03:38:05.770630Z",
+ "base_used": "https://dd.weather.gc.ca/20260829/WXO-DD/marine_weather/pacific",
+ "generated": "2026-08-30T03:55:21.534859Z",
  "zones": {
   "haro": {
    "area": "Haro Strait",
@@ -12,7 +13,7 @@
    "issued": null,
    "label": "Haro Strait",
    "notes": "",
-   "source": "https://hpfx.collab.science.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225956.735Z_MSC_MarineWeather_m0000064_en.xml",
+   "source": "https://dd.weather.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225956.735Z_MSC_MarineWeather_m0000064_en.xml",
    "warnings": [
     {
      "cat": "marine",
@@ -33,7 +34,7 @@
    "issued": null,
    "label": "Juan de Fuca Strait — east entrance",
    "notes": "",
-   "source": "https://hpfx.collab.science.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225946.758Z_MSC_MarineWeather_m0000009_en.xml",
+   "source": "https://dd.weather.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225946.758Z_MSC_MarineWeather_m0000009_en.xml",
    "warnings": [
     {
      "cat": "marine",
@@ -54,7 +55,7 @@
    "issued": null,
    "label": "Strait of Georgia — south of Nanaimo",
    "notes": "",
-   "source": "https://hpfx.collab.science.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225936.738Z_MSC_MarineWeather_m0000028_en.xml",
+   "source": "https://dd.weather.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225936.738Z_MSC_MarineWeather_m0000028_en.xml",
    "warnings": [],
    "waves": ""
   }
