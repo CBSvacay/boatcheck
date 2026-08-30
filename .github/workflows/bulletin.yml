@@ -9,7 +9,11 @@ name: Refresh marine bulletin
 # rather than silent.
 on:
   schedule:
-    - cron: "7 * * * *"
+    # Every 20 minutes rather than hourly. Scheduled jobs on GitHub are
+    # best-effort and get delayed when the service is busy, which was leaving
+    # the measured wind a couple of hours behind. Three chances an hour means a
+    # skipped run barely shows. Nothing is committed when nothing has changed.
+    - cron: "*/20 * * * *"
   workflow_dispatch:      # lets you run it by hand from the Actions tab
 
 permissions:
