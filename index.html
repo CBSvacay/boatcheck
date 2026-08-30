@@ -1503,10 +1503,19 @@ function renderRibbon(ev, sel){
    answers "is today's forecast trustworthy" rather than pretending a reading
    from twenty kilometres away is the water you'll cross. */
 function renderActual(ev, windData, route){
-  if(!REPO_BULLETIN || !REPO_BULLETIN.observations) return "";
-
   const today = new Date(); today.setHours(0,0,0,0);
-  if(Math.round((new Date((ev.day||"")+"T00:00:00") - today)/864e5) !== 0) return "";
+  const isToday = Math.round((new Date((ev.day||"")+"T00:00:00") - today)/864e5) === 0;
+  if(!isToday) return "";
+
+  /* Say why it's missing rather than showing nothing. Silence here looks
+     identical to "the model was perfect", which is the wrong impression. */
+  if(!REPO_BULLETIN)
+    return `<div class="note warn">No measured wind available &mdash;
+      <code>data/bulletin.json</code> didn't load, so there is nothing to compare against.</div>`;
+  if(!REPO_BULLETIN.observations)
+    return `<div class="note warn">No measured wind in <code>data/bulletin.json</code> yet.
+      Run the <em>Refresh marine bulletin</em> job once and the station readings will appear
+      here from then on.</div>`;
 
   // The station the worst leg leans on first.
   let wi = 0, worst = 0;
@@ -1515,7 +1524,10 @@ function renderActual(ev, windData, route){
   }));
   const key = ((route.legs[wi]||{}).obs || [])[0];
   const stn = key && REPO_BULLETIN.observations[key];
-  if(!stn || !stn.readings || !stn.readings.length) return "";
+  if(!stn || !stn.readings || !stn.readings.length)
+    return `<div class="note">No station readings for
+      <strong>${esc((route.legs[wi]||{}).name || "this leg")}</strong> yet. Nothing to compare
+      today's forecast against on this route.</div>`;
 
   const si = (windData.stationKeys||[]).indexOf(key);
   const fBlock = si >= 0 ? windData.blocks[windData.stationIndex + si] : null;
@@ -2449,8 +2461,12 @@ async function run(e){
     }));
     const stationPts = stnKeys.map(k => ({key:k, lat:OBS_STATIONS[k].lat, lon:OBS_STATIONS[k].lon}));
 
-    // Wind and tides are fast and reliable — wait for these.
-    const [wind] = await Promise.all([ loadWind(route.legs, dayISO, stationPts), loadTides(dayISO) ]);
+    /* Load the repo file every time, not only when the bulletin needs
+       refreshing. It also carries the station observations, and those were
+       invisible whenever the cached bulletin was still fresh — which is most
+       of the time. Same origin, so it costs nothing. */
+    const [wind] = await Promise.all([
+      loadWind(route.legs, dayISO, stationPts), loadTides(dayISO), repoBulletin() ]);
     const currents = route.legs.map(l => currentSeries(l.cur, dayISO, l.peakKn, l.offsetMin));
 
     /* The Environment Canada bulletin comes through free public relays and is
