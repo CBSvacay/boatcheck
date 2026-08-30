@@ -38,22 +38,67 @@ from datetime import datetime, timezone
 # Dated paths are built for both today and yesterday UTC, because the rollover
 # happens mid-afternoon Pacific time and the new folder can be empty for a
 # while after it appears.
-TIMEOUT = 30
+TIMEOUT = 12          # per request; a server that hasn't answered by now won't
+DEADLINE_S = 180      # hard stop for the whole run, so it can never hang a job
 UA = {"User-Agent": "Mozilla/5.0 (compatible; boatcheck/1.0; marine bulletin fetcher)",
       "Accept": "*/*"}
+_started = None
+
+
+class OutOfTime(Exception):
+    pass
+
+
+def check_clock():
+    if _started is not None and (datetime.now(timezone.utc) - _started).total_seconds() > DEADLINE_S:
+        raise OutOfTime("gave up after %d seconds" % DEADLINE_S)
+
+
+def last_working_base():
+    """
+    The log showed six canonical addresses failing before the backup answered,
+    which is where the three minutes went. Whichever one worked last time is
+    recorded in the output file and tried first, so a repeat run is quick.
+    """
+    try:
+        with open("data/bulletin.json", encoding="utf-8") as f:
+            return json.load(f).get("base_used")
+    except Exception:
+        return None
 
 
 def candidate_bases():
     from datetime import timedelta
     now = datetime.now(timezone.utc)
     days = [now.strftime("%Y%m%d"), (now - timedelta(days=1)).strftime("%Y%m%d")]
-    out = ["https://dd.weather.gc.ca/today/marine_weather/pacific",
-           "https://dd.meteo.gc.ca/today/marine_weather/pacific"]
-    for host in ("https://dd.weather.gc.ca", "https://dd.meteo.gc.ca",
-                 "https://hpfx.collab.science.gc.ca"):
+    out = []
+    # Dated paths first: they are the real structure. "/today/" is only a
+    # symlink over the top of them and has been seen to 404 on its own.
+    for host in ("https://dd.weather.gc.ca", "https://dd.meteo.gc.ca"):
         for d in days:
             out.append("%s/%s/WXO-DD/marine_weather/pacific" % (host, d))
-    return out
+    out += ["https://dd.weather.gc.ca/today/marine_weather/pacific",
+            "https://dd.meteo.gc.ca/today/marine_weather/pacific"]
+    # hpfx is explicitly "best effort" with no redundancy, so it is the last
+    # resort rather than an early try that can stall the run.
+    for d in days:
+        out.append("https://hpfx.collab.science.gc.ca/%s/WXO-DD/marine_weather/pacific" % d)
+
+    # Promote last time's winner, but keep the rest of the list behind it so a
+    # server that has since gone down doesn't strand us.
+    prev = last_working_base()
+    if prev:
+        today_prev = re.sub(r"/\d{8}/", "/%s/" % days[0], prev)
+        # Insert in reverse so today's dated path ends up ahead of yesterday's.
+        for c in (prev, today_prev):
+            if c in out:
+                out.remove(c)
+            out.insert(0, c)
+    seen, ordered = set(), []
+    for u in out:
+        if u not in seen:
+            seen.add(u); ordered.append(u)
+    return ordered
 
 
 BASE = None      # settled by hour_dirs() once a layout answers
@@ -72,10 +117,22 @@ ZONES = {
 }
 
 
+_listing_cache = {}
+
+
 def get(url):
+    check_clock()
     req = urllib.request.Request(url, headers=UA)
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
         return r.read()
+
+
+def listing(url):
+    """Directory listings are re-read once per zone otherwise — same folder,
+    same answer, three times over."""
+    if url not in _listing_cache:
+        _listing_cache[url] = get(url).decode("utf-8", "replace")
+    return _listing_cache[url]
 
 
 def hour_dirs():
@@ -89,7 +146,7 @@ def hour_dirs():
     tried = []
     for base in candidate_bases():
         try:
-            html = get(base + "/").decode("utf-8", "replace")
+            html = listing(base + "/")
         except urllib.error.HTTPError as e:
             tried.append("%s -> HTTP %s" % (base, e.code));  continue
         except Exception as e:
@@ -112,7 +169,7 @@ def find_file(hours, code):
     """
     for hh in hours:
         try:
-            html = get("%s/%s/" % (BASE, hh)).decode("utf-8", "replace")
+            html = listing("%s/%s/" % (BASE, hh))
         except Exception:
             continue
         names = re.findall(r'href="([^"]*_MSC_MarineWeather_%s_en\.xml)"' % code, html)
@@ -277,6 +334,8 @@ def build_zone(key, spec, hours):
 
 
 def main():
+    global _started
+    _started = datetime.now(timezone.utc)
     try:
         hours = hour_dirs()
     except Exception as e:
@@ -289,9 +348,28 @@ def main():
         try:
             zones[key] = build_zone(key, spec, hours)
             w = len(zones[key]["warnings"])
-            print("  %-5s ok  — %s%s" % (
+            iss = zones[key].get("issued")
+            age = ""
+            if iss:
+                try:
+                    hrs = (datetime.now(timezone.utc)
+                           - datetime.fromisoformat(iss.replace("Z", "+00:00"))
+                           ).total_seconds()/3600
+                    age = ", issued %.1f h ago" % hrs
+                    # Environment Canada issues roughly four times a day, so
+                    # anything past eight hours means the server we reached is
+                    # behind, not that the weather is quiet.
+                    if hrs > 8:
+                        age += "  <-- STALE, check the source server"
+                except Exception:
+                    pass
+            print("  %-5s ok  — %s%s%s" % (
                 key, zones[key]["area"],
-                (", %d alert(s)" % w) if w else ", no alerts"))
+                (", %d alert(s)" % w) if w else ", no alerts", age))
+        except OutOfTime as e:
+            failed[key] = str(e)
+            print("  %-5s FAILED — %s" % (key, e), file=sys.stderr)
+            break
         except Exception as e:
             failed[key] = str(e)
             print("  %-5s FAILED — %s" % (key, e), file=sys.stderr)
@@ -302,6 +380,7 @@ def main():
 
     out = {
         "generated": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "base_used": BASE,
         "zones": zones,
     }
     if failed:
