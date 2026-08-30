@@ -276,8 +276,8 @@ footer a{color:var(--mark)}
 <p class="eyebrow">Small boat check</p>
 <h1 id="title">Southern Gulf Islands</h1>
 <p class="sub" id="subtitle">Tulista Park ramp, Sidney &nbsp;·&nbsp; Glastron SX170</p>
-<p class="sub" style="margin-top:-18px;color:var(--faint);font-size:12px">build 2026-08-30d
-  &nbsp;·&nbsp; observed seas, bands, bulletin scorecard</p>
+<p class="sub" style="margin-top:-18px;color:var(--faint);font-size:12px">build 2026-08-30e
+  &nbsp;·&nbsp; per-hour leg matching, lag warning</p>
 
 <form id="controls" autocomplete="off">
   <div class="f">
@@ -1505,137 +1505,129 @@ function renderRibbon(ev, sel){
    model has been running high or low. Both are read AT THE STATION, so this
    answers "is today's forecast trustworthy" rather than pretending a reading
    from twenty kilometres away is the water you'll cross. */
+/* Observed wind against forecast wind, for today only.
+
+   Mirrors the strip above hour for hour: the same leg the forecast strip
+   called worst that hour, and that leg's own station. A fixed leg was wrong —
+   the strip switches between legs through the day, so the two rows were
+   describing different water at the same hour. */
 function renderActual(ev, windData, route){
   const today = new Date(); today.setHours(0,0,0,0);
-  const isToday = Math.round((new Date((ev.day||"")+"T00:00:00") - today)/864e5) === 0;
-  if(!isToday) return "";
+  if(Math.round((new Date((ev.day||"")+"T00:00:00") - today)/864e5) !== 0) return "";
 
-  /* Say why it's missing rather than showing nothing. Silence here looks
-     identical to "the model was perfect", which is the wrong impression. */
   if(!REPO_BULLETIN)
     return `<div class="note warn">No measured wind available &mdash;
       <code>data/bulletin.json</code> didn't load, so there is nothing to compare against.</div>`;
   if(!REPO_BULLETIN.observations)
     return `<div class="note warn">No measured wind in <code>data/bulletin.json</code> yet.
-      Run the <em>Refresh marine bulletin</em> job once and the station readings will appear
-      here from then on.</div>`;
+      Run the <em>Refresh marine bulletin</em> job once and readings will appear here.</div>`;
 
-  // The station the worst leg leans on first.
-  let wi = 0, worst = 0;
-  ev.hours.forEach(h => h.legs.forEach((l,i) => {
-    if(eff(l).hs > worst){ worst = eff(l).hs; wi = i; }
-  }));
-  const key = ((route.legs[wi]||{}).obs || [])[0];
-  const stn = key && REPO_BULLETIN.observations[key];
-  if(!stn || !stn.readings || !stn.readings.length)
-    return `<div class="note">No station readings for
-      <strong>${esc((route.legs[wi]||{}).name || "this leg")}</strong> yet. Nothing to compare
-      today's forecast against on this route.</div>`;
+  const obsData = REPO_BULLETIN.observations;
+  const usedStations = [], rows = [];
 
-  const si = (windData.stationKeys||[]).indexOf(key);
-  const fBlock = si >= 0 ? windData.blocks[windData.stationIndex + si] : null;
+  ev.hours.forEach(h => {
+    // the leg this hour's forecast cell was built from
+    let wi = 0;
+    h.legs.forEach((l,i) => { if(eff(l).hs > eff(h.legs[wi]).hs) wi = i; });
+    const leg = route.legs[wi];
+    if(!leg) return;
+    const key = (leg.obs || [])[0];
+    const stn = key && obsData[key];
+    if(!stn || !stn.readings) return;
 
-  // Line up readings with the local hours already on the page.
-  /* Run the measured wind through exactly the same arithmetic as the forecast
-     strip: this leg's fetch for the direction it actually blew, then the same
-     wind-against-current treatment. That makes the two strips directly
-     readable against each other rather than one showing knots and the other
-     metres. The assumption — stated plainly below — is that the wind measured
-     at the station also blew over this leg. */
-  const leg = route.legs[wi];
-  const curSeries = (CURRENTS || [])[wi];
-
-  const rows = ev.hours.map(h => {
-    let best = null, bestGap = 45*60000;
+    let best = null, gap = 45*60000;
     stn.readings.forEach(r => {
       const g = Math.abs(new Date(r.t).getTime() - h.ms);
-      if(g < bestGap){ bestGap = g; best = r; }
+      if(g < gap){ gap = g; best = r; }
     });
-    if(!best) return null;
+    if(!best) return;
+    if(!usedStations.includes(stn.name)) usedStations.push(stn.name);
 
     const dir = best.dir != null ? best.dir : 180;
     const sea = fetchLimitedSea(best.kn, fetchMetres(leg, dir));
     let hs = sea.hs, tp = sea.tp, blocked = false;
 
-    const cur = interp(curSeries, h.ms);
+    const cur = interp((CURRENTS||[])[wi], h.ms);
     const setDeg = cur >= 0 ? leg.floodSet : (leg.floodSet+180)%360;
-    const opposed = curSeries && angGap((dir+180)%360, setDeg) >= WAC.oppositionDeg
-                    && Math.abs(cur) >= WAC.minCurrentKn;
-    if(opposed){
+    if((CURRENTS||[])[wi] && angGap((dir+180)%360, setDeg) >= WAC.oppositionDeg
+       && Math.abs(cur) >= WAC.minCurrentKn){
       const r = currentSteepening(hs, tp, Math.abs(cur));
-      hs = r.hs; tp = r.tp; blocked = r.blocked;
+      hs = r.hs; blocked = r.blocked;
     }
     let band = bandFor(hs, best.gust != null ? best.gust : best.kn);
     if(hs >= WAC.minDangerousHs && blocked) band = "red";
 
-    const fc = fBlock ? fBlock[h.hh] : null;
-    return {hh:h.hh, obs:best, hs, band, opposed, blocked,
-            fc: fc ? fc.wind : null,
-            fcScaled: fc && ev.offScale ? fc.wind * ev.offScale : null};
-  }).filter(Boolean);
+    // forecast wind at that same station, so the difference is model error
+    const si = (windData.stationKeys||[]).indexOf(key);
+    const fB = si >= 0 ? windData.blocks[windData.stationIndex + si] : null;
+    const fc = fB ? fB[h.hh] : null;
 
-  if(rows.length < 2) return "";
+    rows.push({hh:h.hh, wi, obs:best, hs, band, blocked, station:stn.name,
+               fcHs: eff(h.legs[wi]).hs,
+               fc: fc ? fc.wind : null,
+               fcScaled: fc && ev.offScale ? fc.wind*ev.offScale : null});
+  });
 
+  if(rows.length < 2)
+    return `<div class="note">Not enough measured wind for today yet. The hourly job fills this in
+      as the day goes on.</div>`;
+
+  const multi = route.legs.length > 1;
   const cells = rows.map(r => {
-    const d = r.fc != null ? r.obs.kn - (USE_BULLETIN && r.fcScaled != null ? r.fcScaled : r.fc) : null;
+    const fcUse = USE_BULLETIN && r.fcScaled != null ? r.fcScaled : r.fc;
+    const d = fcUse != null ? r.obs.kn - fcUse : null;
     const col = d == null ? "var(--faint)"
       : (d >= 3 ? "var(--stop)" : (d <= -3 ? "var(--mark)" : "var(--go)"));
     return `<div class="cell ${r.band}">
       <div class="hr">${r.hh.slice(0,2)}</div><div class="bar"></div>
       <div>${r.hs.toFixed(2)}</div>
       <div class="wd">${r.obs.dir != null ? sectorFor(r.obs.dir) : ""}${r.obs.kn.toFixed(0)}</div>
-      <div class="wd" style="color:${col}">${d == null ? "—" : (d > 0 ? "+" : "") + d.toFixed(0)}</div>
-      ${r.blocked ? `<div class="lg" style="color:var(--stop)">rip</div>` : ""}</div>`;
+      <div class="wd" style="color:${col}">${d == null ? "—" : (d>0?"+":"")+d.toFixed(0)}</div>
+      ${multi ? `<div class="lg">leg ${r.wi+1}</div>` : ""}</div>`;
   }).join("");
 
-  /* Which was closer today — the bulletin or the raw model? That is the
-     question the switch above is really asking, and the measured wind is the
-     only thing that can answer it. */
   const paired = rows.filter(r => r.fc != null);
   const errModel = paired.length
-    ? paired.reduce((a,r)=>a + Math.abs(r.obs.kn - r.fc), 0)/paired.length : null;
+    ? paired.reduce((a,r)=>a+Math.abs(r.obs.kn-r.fc),0)/paired.length : null;
   const errScaled = (paired.length && ev.offScale)
-    ? paired.reduce((a,r)=>a + Math.abs(r.obs.kn - r.fcScaled), 0)/paired.length : null;
+    ? paired.reduce((a,r)=>a+Math.abs(r.obs.kn-r.fcScaled),0)/paired.length : null;
 
   let scoreLine = "";
   if(errModel != null && errScaled != null){
-    const bulletinWon = errScaled < errModel;
-    scoreLine = `<div class="note ${bulletinWon ? "" : "warn"}">
-      <strong>${bulletinWon ? "The bulletin was closer today." : "The raw model was closer today."}</strong>
+    const won = errScaled < errModel;
+    scoreLine = `<div class="note ${won?"":"warn"}">
+      <strong>${won ? "The bulletin was closer today." : "The raw model was closer today."}</strong>
       Against the wind actually measured, Environment Canada's ${ev.offKn} kn was out by an average
       of ${errScaled.toFixed(1)} kn and the model by ${errModel.toFixed(1)} kn.
-      ${bulletinWon
-        ? "Leaving the switch on <em>Forecast applied</em> is the right call for this day."
-        : "The bulletin has overshot this particular day &mdash; but it is built to be cautious, "
-          + "and overshooting is the safe direction to be wrong in."}</div>`;
+      ${won ? "Leaving the switch on <em>Forecast applied</em> is right for this day."
+            : "The bulletin has overshot today &mdash; but it is built to be cautious, and "
+              + "overshooting is the safe direction to be wrong in."}</div>`;
   }
 
-  const bias = paired.length
-    ? paired.reduce((a,r)=>a + (r.obs.kn - (USE_BULLETIN && r.fcScaled != null ? r.fcScaled : r.fc)), 0)/paired.length
-    : null;
-  const worstObs = Math.max(...rows.map(r=>r.hs));
   const last = rows[rows.length-1];
+  const lastMs = new Date(last.obs.t).getTime();
+  const behindMin = Math.round((Date.now() - lastMs)/60000);
+  const lagNote = behindMin > 100
+    ? `<br><br><span style="color:var(--marg)">The newest reading is
+       ${(behindMin/60).toFixed(1)} hours old. The hourly job may be running late &mdash;
+       scheduled jobs on GitHub are best-effort and can be delayed.</span>` : "";
 
-  return `<h2>What actually happened &mdash; ${esc(stn.name)}</h2>
+  return `<h2>What actually happened</h2>
     <div class="ribbon"><div class="ribbon-inner"><div class="cells">${cells}</div></div></div>
     <div class="legend">
-      <span>Seas (m) worked out from the wind that was measured, over
-        <strong>${esc(leg.name)}</strong>'s fetch &mdash; same arithmetic as the strip above.</span>
+      <span>Seas (m) worked out from the wind measured, over the same leg the strip above used
+        that hour &mdash; same arithmetic, so the two rows read against each other.</span>
       <span style="color:var(--stop)">+ windier than forecast</span>
       <span style="color:var(--mark)">&minus; lighter</span>
     </div>
     ${scoreLine}
-    <div class="note">Worst measured hour so far: <strong>${worstObs.toFixed(2)} m</strong>.
-      Last reading ${last.obs.kn.toFixed(0)} kn${
-        last.obs.gust != null ? ` gusting ${last.obs.gust.toFixed(0)}` : ""} at
-      ${last.hh}.${bias != null && Math.abs(bias) >= 2
-        ? ` Running <strong>${Math.abs(bias).toFixed(1)} kn ${bias > 0 ? "above" : "below"}</strong>
-           the forecast on the view you have selected.` : ""}
-      <br><br>The wind is measured at ${esc(stn.name)}; the seas are what that wind would raise over
-      ${esc(leg.name)}. Those are different places, so treat this as a check on the forecast rather
-      than a report from your route.</div>`;
+    <div class="note">Worst measured hour so far:
+      <strong>${Math.max(...rows.map(r=>r.hs)).toFixed(2)} m</strong>, against
+      ${Math.max(...rows.map(r=>r.fcHs)).toFixed(2)} m forecast for the same hours.
+      Readings from ${esc(usedStations.join(", "))}.
+      <br><br>The wind is measured at those stations, not on your legs, so treat this as a check on
+      how well the forecast is holding up today rather than a report from your route.${lagNote}</div>`;
 }
-
 
 function renderLegs(hour){
   if(!hour) return "";
