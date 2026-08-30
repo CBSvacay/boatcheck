@@ -460,7 +460,89 @@ def main():
     with open("data/bulletin.json", "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=1, sort_keys=True)
     print("wrote data/bulletin.json with %d zone(s)" % len(zones))
+
+    try:
+        probe_stations()
+    except Exception as e:
+        print("station probe failed (harmless): %s" % e)
     return 0
+
+
+# ---------------------------------------------------------------------------
+# Station observations — PROBE ONLY, nothing depends on this yet.
+#
+# The page currently links to Kelp Reefs, Saturna and the rest but never reads
+# them, so every figure on it is forecast rather than observation. Before
+# building a "what actually happened" comparison, we need to know whether
+# these stations publish machine-readable data at all.
+#
+# The marine list on the datamart turned out to be moored buoys only, and the
+# nearest is off Nanaimo. These are lightstations, so they should be in the
+# general station list instead. This section looks them up and reports what it
+# finds. Every part is wrapped so a failure here can never affect the bulletin.
+# ---------------------------------------------------------------------------
+
+STATION_LIST = "https://dd.weather.gc.ca/today/observations/doc/swob-xml_station_list.csv"
+SWOB_LATEST = "https://dd.weather.gc.ca/today/observations/swob-ml/latest/"
+
+# Names as they appear on weather.gc.ca, and the leg each one covers.
+WANTED = {
+    "kelp":      ["KELP REEFS"],
+    "saturna":   ["SATURNA", "EAST POINT"],
+    "discovery": ["DISCOVERY ISLAND"],
+    "racerocks": ["RACE ROCKS"],
+    "esquimalt": ["ESQUIMALT"],
+    "yyj":       ["VICTORIA INT"],
+}
+
+
+def probe_stations():
+    import csv, io
+    print()
+    print("station observation probe (informational only)")
+
+    try:
+        raw = get(STATION_LIST).decode("utf-8", "replace")
+    except Exception as e:
+        print("  could not read the station list: %s" % e)
+        return None
+    rows = list(csv.reader(io.StringIO(raw)))
+    header = rows[0] if rows else []
+    print("  station list columns: %s" % ", ".join(h.strip() for h in header[:8]))
+
+    found = {}
+    for key, names in WANTED.items():
+        hit = None
+        for r in rows[1:]:
+            joined = " ".join(r).upper()
+            if any(n in joined for n in names):
+                hit = r
+                break
+        if hit:
+            ids = [c.strip() for c in hit[:1] + hit[8:11] if c.strip()]
+            found[key] = {"row": hit, "ids": ids}
+            print("  %-10s FOUND — %s | ids: %s" % (key, hit[2].strip(), ", ".join(ids) or "none"))
+        else:
+            print("  %-10s not in the list" % key)
+
+    if not found:
+        return None
+
+    # Which of those ids actually has a file waiting in the latest folder?
+    try:
+        listing_html = get(SWOB_LATEST).decode("utf-8", "replace")
+    except Exception as e:
+        print("  could not read the latest observations folder: %s" % e)
+        return found
+    files = set(re.findall(r'href="([^"]+-swob\.xml)"', listing_html))
+    print("  %d files in the latest folder" % len(files))
+    for key, info in found.items():
+        match = [f for f in files
+                 if any(i and i.upper() in f.upper() for i in info["ids"])]
+        print("  %-10s -> %s" % (key, match[0] if match else "no file matched its ids"))
+        if match:
+            info["file"] = match[0]
+    return found
 
 
 if __name__ == "__main__":
