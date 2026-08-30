@@ -456,21 +456,26 @@ def main():
     if failed:
         out["failed"] = failed
 
+    # Read the stored readings BEFORE overwriting the file. They were being
+    # loaded afterwards, from a file this function had just rewritten without
+    # them — so "previous" was always empty and every run re-downloaded the
+    # whole day.
+    prev_obs = {}
+    try:
+        with open("data/bulletin.json", encoding="utf-8") as f:
+            prev_obs = json.load(f).get("observations", {}) or {}
+    except Exception:
+        pass
+
     os.makedirs("data", exist_ok=True)
     with open("data/bulletin.json", "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=1, sort_keys=True)
     print("wrote data/bulletin.json with %d zone(s)" % len(zones))
 
     try:
-        prev = {}
-        try:
-            with open("data/bulletin.json", encoding="utf-8") as f:
-                prev = json.load(f).get("observations", {}) or {}
-        except Exception:
-            pass
         print()
         print("station observations (km/h at source, stored as knots)")
-        obs = fetch_observations(prev)
+        obs = fetch_observations(prev_obs)
         if obs:
             out["observations"] = obs
             with open("data/bulletin.json", "w", encoding="utf-8") as f:
