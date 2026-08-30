@@ -38,6 +38,9 @@ from datetime import datetime, timezone
 # Dated paths are built for both today and yesterday UTC, because the rollover
 # happens mid-afternoon Pacific time and the new folder can be empty for a
 # while after it appears.
+# Bulletins are issued every six hours (04, 10, 16, 22 UTC) plus amendments,
+# so six hours old is normal. Ten means a scheduled issue was missed.
+STALE_AFTER_H = 10
 TIMEOUT = 12          # per request; a server that hasn't answered by now won't
 DEADLINE_S = 180      # hard stop for the whole run, so it can never hang a job
 UA = {"User-Agent": "Mozilla/5.0 (compatible; boatcheck/1.0; marine bulletin fetcher)",
@@ -158,6 +161,27 @@ def hour_dirs():
             return hours
         tried.append("%s -> listing had no hour folders" % base)
     raise RuntimeError("no working datamart path. Tried:\n  " + "\n  ".join(tried))
+
+
+def published_iso(url):
+    """
+    When the datamart published this file, read from its own filename
+    (20260830T100026.074Z_MSC_...).
+
+    This is the honest measure of freshness. The timestamp inside the file is
+    called lastModifiedTime, and if Environment Canada reissues a forecast
+    whose content hasn't changed, that field may well not move — which would
+    make a perfectly current bulletin look ancient. The filename always
+    changes, because a new file is written at every issue time.
+    """
+    m = re.search(r"/(\d{8})T(\d{6})", url)
+    if not m:
+        return None
+    try:
+        return datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S").replace(
+            tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
+    except ValueError:
+        return None
 
 
 def find_file(hours, code):
@@ -290,11 +314,8 @@ def warnings_for(root, match):
     return out
 
 
-def issued_iso(root):
-    dt = root.find("./lastModifiedTime/dateTime")
-    if dt is None:
-        return None
-    ts = text_of(dt.find("timeStamp"))
+def _stamp_to_iso(ts):
+    ts = (ts or "").strip()
     if len(ts) == 12 and ts.isdigit():
         try:
             return datetime.strptime(ts, "%Y%m%d%H%M").replace(
@@ -304,11 +325,58 @@ def issued_iso(root):
     return None
 
 
+def issued_iso(root):
+    """
+    When Environment Canada issued this bulletin.
+
+    The published tag table lists dateTime under both marineData and
+    lastModifiedTime, and each forecast section carries its own, so the exact
+    nesting varies. Rather than assume one path, take every timeStamp in the
+    file and use the most recent that isn't in the future — that is the issue
+    time whichever way the file is arranged.
+    """
+    stamps = []
+    for el in root.iter("timeStamp"):
+        iso = _stamp_to_iso(el.text)
+        if iso:
+            stamps.append(iso)
+    if not stamps:
+        return None
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    past = [x for x in stamps if x <= now]
+    return max(past) if past else min(stamps)
+
+
+def outline(root, depth=2):
+    """Tag structure, for the log, when a timestamp can't be found. Beats
+    guessing at the layout from a documentation table."""
+    lines = []
+
+    def walk(el, d, path):
+        if d > depth:
+            return
+        kids = list(el)
+        tags = sorted({k.tag for k in kids})
+        if tags:
+            lines.append("    %s> %s" % (path, ", ".join(tags)))
+        for t in tags:
+            walk([k for k in kids if k.tag == t][0], d + 1, path + "/" + t)
+
+    walk(root, 0, root.tag)
+    return "\n".join(lines)
+
+
 def build_zone(key, spec, hours):
     url = find_file(hours, spec["code"])
     if not url:
         raise RuntimeError("no current file for %s (%s)" % (key, spec["code"]))
     root = ET.fromstring(get(url))
+
+    iss = issued_iso(root)
+    if iss is None and not build_zone.__dict__.get("shown"):
+        build_zone.__dict__["shown"] = True
+        print("  no timeStamp found — actual file structure:")
+        print(outline(root))
 
     reg = pick_location(root.find("regularForecast"), spec["match"])
     ext = pick_location(root.find("extendedForecast"), spec["match"])
@@ -321,7 +389,8 @@ def build_zone(key, spec, hours):
     z = {
         "label": spec["label"],
         "area": (reg.get("name") if reg is not None else "") or spec["label"],
-        "issued": issued_iso(root),
+        "issued": iss,
+        "published": published_iso(url),
         "source": url,
         "warnings": warnings_for(root, spec["match"]),
         # Only wind and visibility go in .text — see regular_text().
@@ -348,19 +417,20 @@ def main():
         try:
             zones[key] = build_zone(key, spec, hours)
             w = len(zones[key]["warnings"])
-            iss = zones[key].get("issued")
+            when = zones[key].get("published") or zones[key].get("issued")
             age = ""
-            if iss:
+            if when:
                 try:
                     hrs = (datetime.now(timezone.utc)
-                           - datetime.fromisoformat(iss.replace("Z", "+00:00"))
+                           - datetime.fromisoformat(when.replace("Z", "+00:00"))
                            ).total_seconds()/3600
-                    age = ", issued %.1f h ago" % hrs
-                    # Environment Canada issues roughly four times a day, so
-                    # anything past eight hours means the server we reached is
-                    # behind, not that the weather is quiet.
-                    if hrs > 8:
-                        age += "  <-- STALE, check the source server"
+                    age = ", published %.1f h ago" % hrs
+                    # Scheduled issues are six hours apart (04, 10, 16, 22), so
+                    # six hours old is normal right before the next one. Ten
+                    # hours means a whole cycle was missed or the server we
+                    # reached is lagging — that is worth flagging, six is not.
+                    if hrs > STALE_AFTER_H:
+                        age += "  <-- STALE, a scheduled issue was missed"
                 except Exception:
                     pass
             print("  %-5s ok  — %s%s%s" % (
