@@ -22,6 +22,10 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    # A belt-and-braces cap. The script stops itself after three minutes, so
+    # if the job is still going at five something is wrong and it should die
+    # rather than sit there burning minutes.
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
