@@ -1,6 +1,6 @@
 {
- "base_used": "https://dd.weather.gc.ca/20260829/WXO-DD/marine_weather/pacific",
- "generated": "2026-08-30T04:03:31.544094Z",
+ "base_used": "https://dd.weather.gc.ca/20260830/WXO-DD/marine_weather/pacific",
+ "generated": "2026-08-30T05:32:15.228032Z",
  "zones": {
   "haro": {
    "area": "Haro Strait",
@@ -8,13 +8,13 @@
     "text": "Monday: Wind light becoming southwest 5 to 10 knots in the afternoon. Tuesday: Wind light becoming southwest 5 to 15 knots. Wednesday: Wind southeast 15 to 25 knots increasing to southeast 25 to 35."
    },
    "forecast": {
-    "text": "Tonight and Sunday.: Wind southwest 5 to 15 knots except southwest 20 over southern sections. Wind becoming southeast 5 to 15 Sunday morning then becoming light Sunday evening."
+    "text": "Tonight and Sunday.: Wind southwest 5 to 15 knots except southwest 20 over southern sections. Wind becoming southeast 5 to 15 Sunday morning then veering to southwest 5 to 15 early Sunday evening."
    },
-   "issued": "2026-08-29T23:00:00Z",
+   "issued": "2026-08-30T04:32:00Z",
    "label": "Haro Strait",
    "notes": "",
-   "published": "2026-08-29T22:59:56Z",
-   "source": "https://dd.weather.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225956.735Z_MSC_MarineWeather_m0000064_en.xml",
+   "published": "2026-08-30T04:32:31Z",
+   "source": "https://dd.weather.gc.ca/20260830/WXO-DD/marine_weather/pacific/04/20260830T043231.339Z_MSC_MarineWeather_m0000064_en.xml",
    "warnings": [
     {
      "cat": "marine",
@@ -30,13 +30,13 @@
     "text": "Monday: Wind west 5 to 15 knots becoming light in the morning then becoming west 5 to 15 late in the day. Tuesday: Wind west 5 to 15 knots diminishing to light. Wednesday: Wind light increasing to southeast 20 to 30 knots."
    },
    "forecast": {
-    "text": "Tonight and Sunday.: Wind westerly 20 to 25 knots diminishing to westerly 15 to 20 after midnight and to westerly 5 to 15 early Sunday morning."
+    "text": "Tonight and Sunday.: Wind westerly 20 to 30 knots diminishing to westerly 15 to 20 after midnight and to westerly 5 to 15 early Sunday morning."
    },
-   "issued": "2026-08-29T23:00:00Z",
+   "issued": "2026-08-30T04:32:00Z",
    "label": "Juan de Fuca Strait — east entrance",
    "notes": "",
-   "published": "2026-08-29T22:59:46Z",
-   "source": "https://dd.weather.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225946.758Z_MSC_MarineWeather_m0000009_en.xml",
+   "published": "2026-08-30T04:32:31Z",
+   "source": "https://dd.weather.gc.ca/20260830/WXO-DD/marine_weather/pacific/04/20260830T043231.373Z_MSC_MarineWeather_m0000009_en.xml",
    "warnings": [
     {
      "cat": "marine",
@@ -52,13 +52,13 @@
     "text": "Monday: Wind variable 5 to 15 knots becoming northwest 5 to 15 late in the day. Tuesday: Wind variable 5 to 15 knots becoming southeast 10 to 20. Wednesday: Wind southeast 15 to 25 knots increasing to southeast 25 to 35."
    },
    "forecast": {
-    "text": "Tonight and Sunday.: Wind northwest 10 to 15 knots diminishing to light early this evening then becoming southeast 5 to 15 early Sunday morning. Wind becoming light Sunday evening. Showers Sunday."
+    "text": "Tonight and Sunday.: Wind light becoming southeast 5 to 15 knots early Sunday morning then becoming light early Sunday evening. Showers Sunday."
    },
-   "issued": "2026-08-29T23:00:00Z",
+   "issued": "2026-08-30T04:30:00Z",
    "label": "Strait of Georgia — south of Nanaimo",
    "notes": "",
-   "published": "2026-08-29T22:59:36Z",
-   "source": "https://dd.weather.gc.ca/20260829/WXO-DD/marine_weather/pacific/23/20260829T225936.738Z_MSC_MarineWeather_m0000028_en.xml",
+   "published": "2026-08-30T04:28:07Z",
+   "source": "https://dd.weather.gc.ca/20260830/WXO-DD/marine_weather/pacific/04/20260830T042807.376Z_MSC_MarineWeather_m0000028_en.xml",
    "warnings": [],
    "waves": ""
   }
