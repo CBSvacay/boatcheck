@@ -43,5 +43,17 @@ jobs:
           git add data/bulletin.json
           # No change is the normal case between issue times, and an empty
           # commit would just add noise to the history.
-          git diff --staged --quiet || git commit -m "marine bulletin $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push
+          git diff --staged --quiet && echo "nothing changed" && exit 0
+          git commit -m "marine bulletin $(date -u +%Y-%m-%dT%H:%MZ)"
+          # Anything committed while this job was running — a scheduled run,
+          # or an edit in the browser — leaves this push rejected. Rebase on
+          # top and retry rather than failing the job. Only data/bulletin.json
+          # is ever touched here, so there is nothing to conflict with.
+          for i in 1 2 3; do
+            git push && exit 0
+            echo "push rejected, rebasing and retrying ($i)"
+            git pull --rebase --autostash origin main || true
+            sleep 3
+          done
+          echo "could not push after three attempts" >&2
+          exit 1
