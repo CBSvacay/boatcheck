@@ -758,6 +758,7 @@ let FORCE_BULLETIN = false;   // set by "Try again now"; never deletes the cache
    optimistic wave heights with nothing checking them. */
 let USE_BULLETIN = true;
 let REDRAW = null;           // set by run(); lets the switch rebuild from data already in hand
+let WIND_DATA = null;        // kept so the observed-vs-forecast strip can reach the station blocks
 let FETCH_ERR = null;         // last fetch failure, kept even when a cached copy is used
 let MANUAL_KN = null;   // wind the user typed from the official bulletin
 
@@ -792,6 +793,18 @@ const BULLETIN_STALE_MIN = 720;   // 12 h — still far better than no forecast
    Environment Canada retired the marine feed at weather.gc.ca/rss/marine/,
    which is why the relays started returning "bad XML" — they were fetching an
    error page. See scripts/fetch_bulletin.py. */
+/* Must match STATIONS in scripts/fetch_bulletin.py. Codes were pinned there
+   after a name search turned up an air-quality site and an East Point in Nova
+   Scotia. */
+const OBS_STATIONS = {
+  kelp:      {code:"CWZO", name:"Kelp Reefs",        lat:48.5476, lon:-123.2369},
+  saturna:   {code:"CWEZ", name:"Saturna Island",    lat:48.7832, lon:-123.0458},
+  discovery: {code:"CWDR", name:"Discovery Island",  lat:48.4246, lon:-123.2258},
+  racerocks: {code:"CWQK", name:"Race Rocks",        lat:48.2980, lon:-123.5314},
+  esquimalt: {code:"CWPF", name:"Esquimalt Harbour", lat:48.4320, lon:-123.4393},
+  yyj:       {code:"CYYJ", name:"Victoria Int'l",    lat:48.6472, lon:-123.4260}
+};
+
 const REPO_BULLETIN_URL = "data/bulletin.json";
 const REPO_TTL_MIN = 100;    // hourly job plus slack for GitHub's scheduler
 let REPO_BULLETIN;           // undefined = not tried yet, null = not available
@@ -1129,8 +1142,12 @@ async function loadTides(dayISO){
   }
 }
 
-async function loadWind(legsIn, dayISO){
-  const legs = [...legsIn, OPEN_REF];        // last block is the open-water reference
+async function loadWind(legsIn, dayISO, stationPts){
+  /* Station coordinates ride along so the model can be sampled exactly where
+     the station stands. Comparing a station reading against the forecast for
+     a leg 20 km away would show a disagreement that is only distance. */
+  const stns = stationPts || [];
+  const legs = [...legsIn, OPEN_REF, ...stns];
   const days = Math.round((new Date(dayISO+"T12:00") - new Date(new Date().toDateString()))/864e5);
   const model = days <= 2 ? "gem_hrdps_continental" : "best_match";
   const p = new URLSearchParams({
@@ -1149,7 +1166,8 @@ async function loadWind(legsIn, dayISO){
      would quietly become a one-leg route with no warning at all. */
   if(j.length !== legs.length)
     throw new Error(`weather service returned ${j.length} locations for ${legs.length} requested`);
-  return { model, refIndex: legs.length-1, blocks: j.map(b => {
+  return { model, refIndex: legsIn.length, stationIndex: legsIn.length+1,
+           stationKeys: stns.map(x=>x.key), blocks: j.map(b => {
     const m = {};
     b.hourly.time.forEach((t,i)=>{ m[t.slice(11,16)] = {
       wind: b.hourly.wind_speed_10m[i], gust: b.hourly.wind_gusts_10m[i],
@@ -1476,6 +1494,89 @@ function renderRibbon(ev, sel){
     ${ev.hours.some(h=>h.legs.some(l=>eff(l).scaled))
       ? `<span style="color:var(--marg)">* raised to Environment Canada's forecast — the model read lower.</span>`
       : ""}</div>`;
+}
+
+/* Observed wind against forecast wind, for today only.
+
+   Deliberately compact: one row of hours, and one sentence saying whether the
+   model has been running high or low. Both are read AT THE STATION, so this
+   answers "is today's forecast trustworthy" rather than pretending a reading
+   from twenty kilometres away is the water you'll cross. */
+function renderActual(ev, windData, route){
+  if(!REPO_BULLETIN || !REPO_BULLETIN.observations) return "";
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  if(Math.round((new Date((ev.day||"")+"T00:00:00") - today)/864e5) !== 0) return "";
+
+  // The station the worst leg leans on first.
+  let wi = 0, worst = 0;
+  ev.hours.forEach(h => h.legs.forEach((l,i) => {
+    if(eff(l).hs > worst){ worst = eff(l).hs; wi = i; }
+  }));
+  const key = ((route.legs[wi]||{}).obs || [])[0];
+  const stn = key && REPO_BULLETIN.observations[key];
+  if(!stn || !stn.readings || !stn.readings.length) return "";
+
+  const si = (windData.stationKeys||[]).indexOf(key);
+  const fBlock = si >= 0 ? windData.blocks[windData.stationIndex + si] : null;
+
+  // Line up readings with the local hours already on the page.
+  const rows = ev.hours.map(h => {
+    const ms = h.ms;
+    let best = null, bestGap = 45*60000;
+    stn.readings.forEach(r => {
+      const g = Math.abs(new Date(r.t).getTime() - ms);
+      if(g < bestGap){ bestGap = g; best = r; }
+    });
+    const fc = fBlock ? fBlock[h.hh] : null;
+    return {hh:h.hh, obs:best, fc: fc ? fc.wind : null};
+  }).filter(r => r.obs);
+
+  if(rows.length < 2) return "";
+
+  const paired = rows.filter(r => r.fc != null);
+  const bias = paired.length
+    ? paired.reduce((a,r)=>a + (r.obs.kn - r.fc), 0)/paired.length : null;
+
+  const cells = rows.map(r => {
+    const d = r.fc != null ? r.obs.kn - r.fc : null;
+    const col = d == null ? "var(--dim)" : (d >= 3 ? "var(--stop)" : (d <= -3 ? "var(--mark)" : "var(--go)"));
+    return `<div class="cell">
+      <div class="hr">${r.hh.slice(0,2)}</div>
+      <div style="color:var(--text)">${r.obs.kn.toFixed(0)}</div>
+      <div class="wd">${r.obs.dir != null ? sectorFor(r.obs.dir) : ""}${
+        r.obs.gust != null ? " g"+r.obs.gust.toFixed(0) : ""}</div>
+      <div class="wd" style="color:${col}">${
+        d == null ? "—" : (d > 0 ? "+" : "") + d.toFixed(0)}</div></div>`;
+  }).join("");
+
+  const verdict = bias == null ? ""
+    : Math.abs(bias) < 2
+      ? `<strong>The model has been about right today</strong> at ${esc(stn.name)} &mdash;
+         within ${Math.abs(bias).toFixed(1)} kn on average. Treat the rest of the day's figures
+         as reasonable.`
+    : bias > 0
+      ? `<strong>It has been blowing harder than forecast today</strong> &mdash; ${esc(stn.name)}
+         is averaging <strong>${bias.toFixed(1)} kn above</strong> the model. Expect the wave
+         figures above to be understated, and give yourself more room than they suggest.`
+      : `<strong>It has been lighter than forecast today</strong> &mdash; ${esc(stn.name)} is
+         averaging ${Math.abs(bias).toFixed(1)} kn below the model. The figures above are
+         probably pessimistic, but a sea breeze can still fill in later.`;
+
+  const last = rows[rows.length-1].obs;
+  return `<h2>What actually happened &mdash; ${esc(stn.name)}</h2>
+    <div class="ribbon"><div class="ribbon-inner"><div class="cells">${cells}</div></div></div>
+    <div class="legend">
+      <span>Measured wind (kn), direction and gust, then the difference from the forecast
+        at this same spot.</span>
+      <span style="color:var(--stop)">+ windier than forecast</span>
+      <span style="color:var(--mark)">&minus; lighter</span>
+    </div>
+    <div class="note">${verdict}
+      <br><br>Last reading <strong>${last.t.slice(11,16)} UTC</strong>,
+      ${last.kn.toFixed(0)} kn${last.gust != null ? ` gusting ${last.gust.toFixed(0)}` : ""}.
+      This is one station, not your route &mdash; it tells you how much to trust today's
+      forecast, not what the water is doing where you'll be.</div>`;
 }
 
 function renderLegs(hour){
@@ -2187,6 +2288,8 @@ function render(ev, win, model){
   }
   h += renderRibbon(ev, win ? [win.depHH, win.retHH] : null);
 
+  h += renderActual(ev, WIND_DATA, route);
+
   const best = bestWindows(ev);
   const dayLabel = (() => {
     const d = new Date((ev.day||"")+"T12:00:00");
@@ -2338,14 +2441,23 @@ async function run(e){
     const mk = parseFloat($("offwind").value);
     MANUAL_KN = (isFinite(mk) && mk > 0 && mk <= 70) ? mk : null;
 
+    /* Stations this route's legs actually name, in leg order. Used both to
+       sample the model at each station and to pick which one to compare. */
+    const stnKeys = [];
+    route.legs.forEach(l => (l.obs||[]).forEach(k => {
+      if(!stnKeys.includes(k) && OBS_STATIONS[k]) stnKeys.push(k);
+    }));
+    const stationPts = stnKeys.map(k => ({key:k, lat:OBS_STATIONS[k].lat, lon:OBS_STATIONS[k].lon}));
+
     // Wind and tides are fast and reliable — wait for these.
-    const [wind] = await Promise.all([ loadWind(route.legs, dayISO), loadTides(dayISO) ]);
+    const [wind] = await Promise.all([ loadWind(route.legs, dayISO, stationPts), loadTides(dayISO) ]);
     const currents = route.legs.map(l => currentSeries(l.cur, dayISO, l.peakKn, l.offsetMin));
 
     /* The Environment Canada bulletin comes through free public relays and is
        slow and unreliable. Waiting on it made the page feel broken, and cutting
        it short made it fail four times in five. So: draw immediately with what
        we have, then redraw if and when the bulletin arrives. */
+    WIND_DATA = wind;
     const draw = () => {
       const ev = evaluate(routeKey, dayISO, wind, currents);
       if(!ev.hours.length){
