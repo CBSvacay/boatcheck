@@ -753,6 +753,11 @@ const worseOf = (a,b) => ({green:0,yellow:1,red:2}[a] >= {green:0,yellow:1,red:2
 let TIDES = null, TIDE_ERR = null, TIDE_SRC = null;
 let BULLETIN = null, BULLETIN_ERR = null, BULLETIN_PENDING = false, RUN_TOKEN = 0;
 let FORCE_BULLETIN = false;   // set by "Try again now"; never deletes the cache
+/* The bulletin scaling switch. ON is the only safe default, so this is reset
+   to true on every Check — leaving it off by accident would quietly hand back
+   optimistic wave heights with nothing checking them. */
+let USE_BULLETIN = true;
+let REDRAW = null;           // set by run(); lets the switch rebuild from data already in hand
 let FETCH_ERR = null;         // last fetch failure, kept even when a cached copy is used
 let MANUAL_KN = null;   // wind the user typed from the official bulletin
 
@@ -1231,7 +1236,7 @@ function evaluate(routeKey, dayISO, windData, currents){
   Object.values(refBlock || {}).forEach(w => {
     if(w && w.wind > modelPeak) modelPeak = w.wind;
   });
-  const offScale = (OFF && modelPeak > 0 && OFF.maxKn > modelPeak)
+  const offScale = (USE_BULLETIN && OFF && modelPeak > 0 && OFF.maxKn > modelPeak)
     ? OFF.maxKn / modelPeak : null;
   const hours = [];
   for(let h=5; h<=21; h++){
@@ -2160,7 +2165,27 @@ function render(ev, win, model){
     }
   }
 
-  h += `<h2>Hour by hour</h2>` + renderRibbon(ev, win ? [win.depHH, win.retHH] : null);
+  /* Sits directly above the strip, because comparing the two states of this
+     one graphic is the whole point of the switch. */
+  const off = officialForDay(ev.day || "", route.zones);
+  h += `<h2>Hour by hour</h2>`;
+  if(off){
+    h += `<div class="maptabs" style="margin-bottom:12px">
+      <button type="button" class="mtab${USE_BULLETIN?" on":""}" id="bulon">Forecast applied</button>
+      <button type="button" class="mtab${USE_BULLETIN?"":" on"}" id="buloff">Model only</button>
+    </div>`;
+    h += USE_BULLETIN
+      ? `<div class="note" style="margin-top:0">Wave heights are raised to Environment Canada's
+          <strong>${off.maxKn} kn</strong> where the model reads lower. Marked <span
+          style="color:var(--marg)">*</span> in the strip. Switch to <em>Model only</em> to see
+          what this day looks like without the bulletin.</div>`
+      : `<div class="note err" style="margin-top:0"><strong>Bulletin switched off.</strong>
+          These are raw model figures, and the model reads low here more often than not — the
+          official forecast for this day is <strong>${off.maxKn} kn</strong>. This view is for
+          comparison only. <strong>Do not plan from it.</strong> It switches itself back on the
+          next time you press Check.</div>`;
+  }
+  h += renderRibbon(ev, win ? [win.depHH, win.retHH] : null);
 
   const best = bestWindows(ev);
   const dayLabel = (() => {
@@ -2244,6 +2269,10 @@ function render(ev, win, model){
     initStationMap(route, ev, btn.dataset.hh);
   });
 
+  const bOn = document.getElementById("bulon"), bOff = document.getElementById("buloff");
+  if(bOn)  bOn.onclick  = () => { if(!USE_BULLETIN){ USE_BULLETIN = true;  REDRAW && REDRAW(); } };
+  if(bOff) bOff.onclick = () => { if(USE_BULLETIN){  USE_BULLETIN = false; REDRAW && REDRAW(); } };
+
   const rb = document.getElementById("refreshbul");
   if(rb) rb.onclick = (e) => {
     e.preventDefault();
@@ -2298,6 +2327,10 @@ async function run(e){
   const routeKey = $("route").value, dayISO = $("day").value;
   if(!dayISO) return;
   $("run").disabled = true;
+  /* Always back on for a fresh check. The switch is a comparison tool, not a
+     setting, and an optimistic view left on by accident is exactly the kind of
+     thing that gets someone into trouble. */
+  USE_BULLETIN = true;
   $("out").innerHTML = `<p class="loading">Fetching forecast and tides…</p>`;
 
   try{
@@ -2336,6 +2369,9 @@ async function run(e){
       render(ev, win, wind.model);
       return true;
     };
+    /* The switch redraws from data already fetched — no network round trip,
+       so flipping between the two views is instant. */
+    REDRAW = draw;
 
     const zones = route.zones || ["haro"];
     const cached = cachedBulletins(zones);
