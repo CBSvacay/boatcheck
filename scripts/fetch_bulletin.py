@@ -482,6 +482,11 @@ def main():
                 json.dump(out, f, ensure_ascii=False, indent=1, sort_keys=True)
     except Exception as e:
         print("observations failed (bulletin unaffected): %s" % e)
+
+    try:
+        probe_saanich()
+    except Exception as e:
+        print("Saanich search failed (harmless): %s" % e)
     return 0
 
 
@@ -561,6 +566,50 @@ def parse_swob(xml):
             "kn": round(spd*KMH_TO_KN, 1),
             "gust": round(gst*KMH_TO_KN, 1) if gst is not None else None,
             "dir": int(dr) if dr is not None else None}
+
+
+SAANICH_CANDIDATES = ["MALAHAT", "PATRICIA BAY", "BRENTWOOD", "MILL BAY",
+                      "SAANICH", "COLES BAY", "SHAWNIGAN"]
+
+
+def probe_saanich():
+    """
+    Is there a reporting station inside Saanich Inlet?
+
+    The Brentwood Bay route runs down a fjord with no station in it, so the
+    observed-vs-forecast check falls back to Victoria Airport, which sits on
+    the far side of the peninsula. Worth knowing whether something closer
+    exists before settling for that.
+    """
+    import csv, io
+    print()
+    print("Saanich Inlet station search")
+    try:
+        rows = list(csv.reader(io.StringIO(get(STATION_LIST).decode("utf-8", "replace"))))
+        files = set(re.findall(r'href="([^"]+-swob\.xml)"',
+                               get(SWOB_LATEST).decode("utf-8", "replace")))
+    except Exception as e:
+        print("  lookup failed: %s" % e)
+        return
+    for r in rows[1:]:
+        if len(r) < 6:
+            continue
+        name = r[1].strip().upper()
+        if not any(c in name for c in SAANICH_CANDIDATES):
+            continue
+        try:
+            lat, lon = float(r[4]), float(r[5])
+        except ValueError:
+            continue
+        # only the corner of the world we care about
+        if not (48.3 < lat < 49.0 and -124.0 < lon < -123.2):
+            continue
+        code = r[0].strip().upper()
+        has = [f for f in files if code and f.upper().startswith(code + "-")]
+        print("  %-6s %-30s %.4f, %.4f  %s" % (
+            code, r[1].strip()[:30], lat, lon,
+            sorted(has, key=len)[0] if has else "no live file"))
+    print("  (Brentwood legs use Victoria Int'l until something closer is confirmed)")
 
 
 def names_only(pairs):
