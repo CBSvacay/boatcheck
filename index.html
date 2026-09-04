@@ -276,8 +276,8 @@ footer a{color:var(--mark)}
 <p class="eyebrow">Small boat check</p>
 <h1 id="title">Southern Gulf Islands</h1>
 <p class="sub" id="subtitle">Tulista Park ramp, Sidney &nbsp;·&nbsp; Glastron SX170</p>
-<p class="sub" style="margin-top:-18px;color:var(--faint);font-size:12px">build 2026-08-30e
-  &nbsp;·&nbsp; per-hour leg matching, lag warning</p>
+<p class="sub" style="margin-top:-18px;color:var(--faint);font-size:12px">build 2026-08-30f
+  &nbsp;·&nbsp; Brentwood Bay / Saanich Inlet</p>
 
 <form id="controls" autocomplete="off">
   <div class="f">
@@ -659,6 +659,39 @@ const ROUTES = {
        lowTideCautionM:1.5 },
      hazards:[
     "Pender Canal is narrow and shallow with a low fixed bridge. Your boat has no air draft problem — depth and current are what matter. The alternative is the long way round via Plumper Sound."
+  ]},
+  brentwood: { label: "Brentwood Bay (Saanich Inlet)", nm: 21.0, zones: ["haro","sog"], legs: [
+    { name:"Colburne & Moresby passages", obs:["yyj"], lat:48.6900, lon:-123.3800,
+      cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
+      fetch:{N:4,NE:5,E:6,SE:6,S:4,SW:3,W:3,NW:10} },
+    { name:"Satellite Channel", obs:["yyj","kelp"], lat:48.7200, lon:-123.4500,
+      cur:"sidney", floodSet:100, peakKn:2.0, offsetMin:0,
+      fetch:{N:5,NE:6,E:8,SE:8,S:5,SW:8,W:15,NW:14},
+      note:"The exposed leg of this run. An afternoon westerly funnels out of Sansum Narrows here and the zone forecast underplays it." },
+    { name:"Saanich Inlet", obs:["yyj"], lat:48.6300, lon:-123.4900,
+      cur:"patricia", floodSet:160, peakKn:1.0, offsetMin:0,
+      fetch:{N:12,NE:6,E:2,SE:3,S:14,SW:4,W:2,NW:8},
+      note:"A steep-sided fjord. Almost nothing from the east or west, but it funnels hard north and south. Currents are weak apart from over the sill at the entrance." },
+    { name:"Brentwood Bay approach", obs:["yyj"], lat:48.5780, lon:-123.4700,
+      cur:"patricia", floodSet:160, peakKn:0.8, offsetMin:0,
+      fetch:{N:10,NE:5,E:2,SE:2,S:6,SW:3,W:2,NW:6},
+      note:"The Mill Bay ferry crosses your track here. Todd Inlet and Butchart Gardens are a mile further south." }
+  ], cheat:{
+      rule:"Victoria Airport wind ÷ 32 in the inlet from the south, ÷ 35 from the north. Satellite Channel: westerly ÷ 31.",
+      bad:"Westerly in Satellite Channel; northerly or southerly once you're in the inlet",
+      watch:[
+        "Satellite Channel is the only genuinely exposed part. Once you turn south into the inlet you're behind high ground.",
+        "The inlet funnels north and south and blocks everything else — a westerly that's making Satellite Channel unpleasant may be nothing once you're inside.",
+        "The Mill Bay ferry crosses between Brentwood Bay and Mill Bay. Cross square to it.",
+        "42 nm round trip around the top of the peninsula. It is a long day, not a quick run.",
+        "Butchart Gardens is in Todd Inlet just south of Brentwood — shallow, busy, and slow speed."
+      ],
+      bail:"Patricia Bay or Coles Bay inside the inlet, or turn back into Colburne Passage." },
+     links:["haro","sog","summary","tideSidney","tables"],
+     hazards:[
+    "42 nm round trip. At a 15 kn chop cruise that is about 85 minutes each way — fuel with real reserve and start early.",
+    "Currents in Saanich Inlet are weak, but there is a sill at the entrance where the tide runs harder than the rest of the inlet suggests. The figures here are derived from tide height and are indicative only.",
+    "Fetch values for the inlet are chart estimates and have not been checked against the water yet. If a leg reads wrong, those are the first thing to tune."
   ]},
   ganges: { label: "Ganges Marina, Salt Spring", nm: 19.0, zones: ["haro","sog"], legs: [
     { name:"Colburne & Moresby passages", obs:["yyj"], lat:48.6900, lon:-123.3800,
@@ -1081,6 +1114,7 @@ const STATION_KEYS = {
   sidney:  [["sidney"],           48.65, -123.39],
   bedwell: [["bedwell"],          48.75, -123.23],
   fulford: [["fulford"],          48.77, -123.45],
+  patricia: [["patricia"],        48.65, -123.45],
   ganges:  [["ganges"],           48.85, -123.50]
 };
 const TIDE_FALLBACK = "sidney";
