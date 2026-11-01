@@ -1,6 +1,6 @@
 {
  "base_used": "https://hpfx.collab.science.gc.ca/20261101/WXO-DD/marine_weather/pacific",
- "generated": "2026-11-01T08:35:27.803989Z",
+ "generated": "2026-11-01T15:26:15.401340Z",
  "observations": {
   "discovery": {
    "code": "CWDR",
@@ -8,48 +8,6 @@
    "lon": -123.2258,
    "name": "Discovery Island",
    "readings": [
-    {
-     "dir": 48,
-     "gust": 13.5,
-     "kn": 10.5,
-     "t": "2026-10-30T21:00:00.000Z"
-    },
-    {
-     "dir": 55,
-     "gust": 14.3,
-     "kn": 11.2,
-     "t": "2026-10-30T22:00:00.000Z"
-    },
-    {
-     "dir": 71,
-     "gust": 16.3,
-     "kn": 12.7,
-     "t": "2026-10-30T23:00:00.000Z"
-    },
-    {
-     "dir": 69,
-     "gust": 12.6,
-     "kn": 9.9,
-     "t": "2026-10-31T00:00:00.000Z"
-    },
-    {
-     "dir": 81,
-     "gust": 15.5,
-     "kn": 11.7,
-     "t": "2026-10-31T01:00:00.000Z"
-    },
-    {
-     "dir": 84,
-     "gust": 15.3,
-     "kn": 11.6,
-     "t": "2026-10-31T02:00:00.000Z"
-    },
-    {
-     "dir": 82,
-     "gust": 15.2,
-     "kn": 12.0,
-     "t": "2026-10-31T03:00:00.000Z"
-    },
     {
      "dir": 81,
      "gust": 13.7,
@@ -207,6 +165,12 @@
      "t": "2026-11-01T05:00:00.000Z"
     },
     {
+     "dir": 324,
+     "gust": 9.2,
+     "kn": 4.8,
+     "t": "2026-11-01T06:00:00.000Z"
+    },
+    {
      "dir": 318,
      "gust": 7.9,
      "kn": 4.4,
@@ -217,6 +181,48 @@
      "gust": 7.6,
      "kn": 4.2,
      "t": "2026-11-01T08:00:00.000Z"
+    },
+    {
+     "dir": 353,
+     "gust": 10.1,
+     "kn": 6.7,
+     "t": "2026-11-01T09:00:00.000Z"
+    },
+    {
+     "dir": 356,
+     "gust": 12.8,
+     "kn": 8.6,
+     "t": "2026-11-01T10:00:00.000Z"
+    },
+    {
+     "dir": 357,
+     "gust": 13.6,
+     "kn": 10.1,
+     "t": "2026-11-01T11:00:00.000Z"
+    },
+    {
+     "dir": 3,
+     "gust": 13.4,
+     "kn": 10.6,
+     "t": "2026-11-01T12:00:00.000Z"
+    },
+    {
+     "dir": 3,
+     "gust": 12.9,
+     "kn": 9.8,
+     "t": "2026-11-01T13:00:00.000Z"
+    },
+    {
+     "dir": 8,
+     "gust": 11.2,
+     "kn": 8.9,
+     "t": "2026-11-01T14:00:00.000Z"
+    },
+    {
+     "dir": 1,
+     "gust": 12.2,
+     "kn": 7.5,
+     "t": "2026-11-01T15:00:00.000Z"
     }
    ]
   },
@@ -226,48 +232,6 @@
    "lon": -123.4393,
    "name": "Esquimalt Harbour",
    "readings": [
-    {
-     "dir": 1,
-     "gust": 9.3,
-     "kn": 6.2,
-     "t": "2026-10-30T21:00:00.000Z"
-    },
-    {
-     "dir": 9,
-     "gust": 10.6,
-     "kn": 6.9,
-     "t": "2026-10-30T22:00:00.000Z"
-    },
-    {
-     "dir": 24,
-     "gust": 10.1,
-     "kn": 6.6,
-     "t": "2026-10-30T23:00:00.000Z"
-    },
-    {
-     "dir": 16,
-     "gust": 7.3,
-     "kn": 5.2,
-     "t": "2026-10-31T00:00:00.000Z"
-    },
-    {
-     "dir": 354,
-     "gust": 8.3,
-     "kn": 5.9,
-     "t": "2026-10-31T01:00:00.000Z"
-    },
-    {
-     "dir": 357,
-     "gust": 8.9,
-     "kn": 6.4,
-     "t": "2026-10-31T02:00:00.000Z"
-    },
-    {
-     "dir": 2,
-     "gust": 9.0,
-     "kn": 6.7,
-     "t": "2026-10-31T03:00:00.000Z"
-    },
     {
      "dir": 6,
      "gust": 7.9,
@@ -441,6 +405,48 @@
      "gust": 4.6,
      "kn": 3.1,
      "t": "2026-11-01T08:00:00.000Z"
+    },
+    {
+     "dir": 3,
+     "gust": 4.2,
+     "kn": 3.1,
+     "t": "2026-11-01T09:00:00.000Z"
+    },
+    {
+     "dir": 1,
+     "gust": 5.1,
+     "kn": 3.1,
+     "t": "2026-11-01T10:00:00.000Z"
+    },
+    {
+     "dir": 357,
+     "gust": 5.6,
+     "kn": 4.5,
+     "t": "2026-11-01T11:00:00.000Z"
+    },
+    {
+     "dir": 1,
+     "gust": 5.6,
+     "kn": 3.6,
+     "t": "2026-11-01T12:00:00.000Z"
+    },
+    {
+     "dir": 14,
+     "gust": 4.6,
+     "kn": 2.5,
+     "t": "2026-11-01T13:00:00.000Z"
+    },
+    {
+     "dir": 7,
+     "gust": 5.5,
+     "kn": 4.2,
+     "t": "2026-11-01T14:00:00.000Z"
+    },
+    {
+     "dir": 358,
+     "gust": 6.0,
+     "kn": 4.8,
+     "t": "2026-11-01T15:00:00.000Z"
     }
    ]
   },
@@ -450,48 +456,6 @@
    "lon": -123.2369,
    "name": "Kelp Reefs",
    "readings": [
-    {
-     "dir": 50,
-     "gust": 13.0,
-     "kn": 9.4,
-     "t": "2026-10-30T21:00:00.000Z"
-    },
-    {
-     "dir": 65,
-     "gust": 13.4,
-     "kn": 9.1,
-     "t": "2026-10-30T22:00:00.000Z"
-    },
-    {
-     "dir": 62,
-     "gust": 13.4,
-     "kn": 10.4,
-     "t": "2026-10-30T23:00:00.000Z"
-    },
-    {
-     "dir": 63,
-     "gust": 13.0,
-     "kn": 8.4,
-     "t": "2026-10-31T00:00:00.000Z"
-    },
-    {
-     "dir": 74,
-     "gust": 13.1,
-     "kn": 7.1,
-     "t": "2026-10-31T01:00:00.000Z"
-    },
-    {
-     "dir": 76,
-     "gust": 11.5,
-     "kn": 9.1,
-     "t": "2026-10-31T02:00:00.000Z"
-    },
-    {
-     "dir": 76,
-     "gust": 9.6,
-     "kn": 7.1,
-     "t": "2026-10-31T03:00:00.000Z"
-    },
     {
      "dir": 83,
      "gust": 11.6,
@@ -665,6 +629,48 @@
      "gust": 11.0,
      "kn": 8.9,
      "t": "2026-11-01T08:00:00.000Z"
+    },
+    {
+     "dir": 330,
+     "gust": 10.5,
+     "kn": 8.3,
+     "t": "2026-11-01T09:00:00.000Z"
+    },
+    {
+     "dir": 328,
+     "gust": 12.0,
+     "kn": 9.9,
+     "t": "2026-11-01T10:00:00.000Z"
+    },
+    {
+     "dir": 337,
+     "gust": 11.7,
+     "kn": 8.8,
+     "t": "2026-11-01T11:00:00.000Z"
+    },
+    {
+     "dir": 331,
+     "gust": 11.2,
+     "kn": 8.3,
+     "t": "2026-11-01T12:00:00.000Z"
+    },
+    {
+     "dir": 328,
+     "gust": 13.3,
+     "kn": 9.4,
+     "t": "2026-11-01T13:00:00.000Z"
+    },
+    {
+     "dir": 333,
+     "gust": 10.0,
+     "kn": 8.0,
+     "t": "2026-11-01T14:00:00.000Z"
+    },
+    {
+     "dir": 329,
+     "gust": 10.5,
+     "kn": 7.7,
+     "t": "2026-11-01T15:00:00.000Z"
     }
    ]
   },
@@ -674,48 +680,6 @@
    "lon": -123.5314,
    "name": "Race Rocks",
    "readings": [
-    {
-     "dir": 30,
-     "gust": 17.6,
-     "kn": 14.3,
-     "t": "2026-10-30T21:00:00.000Z"
-    },
-    {
-     "dir": null,
-     "gust": 18.3,
-     "kn": 13.9,
-     "t": "2026-10-30T22:00:00.000Z"
-    },
-    {
-     "dir": 47,
-     "gust": 17.9,
-     "kn": 14.3,
-     "t": "2026-10-30T23:00:00.000Z"
-    },
-    {
-     "dir": 49,
-     "gust": 17.2,
-     "kn": 13.2,
-     "t": "2026-10-31T00:00:00.000Z"
-    },
-    {
-     "dir": 40,
-     "gust": 17.7,
-     "kn": 13.3,
-     "t": "2026-10-31T01:00:00.000Z"
-    },
-    {
-     "dir": 31,
-     "gust": 18.1,
-     "kn": 13.9,
-     "t": "2026-10-31T02:00:00.000Z"
-    },
-    {
-     "dir": 10,
-     "gust": 19.2,
-     "kn": 16.1,
-     "t": "2026-10-31T03:00:00.000Z"
-    },
     {
      "dir": 27,
      "gust": 20.6,
@@ -889,6 +853,48 @@
      "gust": 5.3,
      "kn": 3.6,
      "t": "2026-11-01T08:00:00.000Z"
+    },
+    {
+     "dir": 64,
+     "gust": 6.3,
+     "kn": 3.6,
+     "t": "2026-11-01T09:00:00.000Z"
+    },
+    {
+     "dir": 51,
+     "gust": 4.7,
+     "kn": 3.1,
+     "t": "2026-11-01T10:00:00.000Z"
+    },
+    {
+     "dir": 36,
+     "gust": 6.0,
+     "kn": 4.2,
+     "t": "2026-11-01T11:00:00.000Z"
+    },
+    {
+     "dir": null,
+     "gust": 4.9,
+     "kn": 3.5,
+     "t": "2026-11-01T12:00:00.000Z"
+    },
+    {
+     "dir": 76,
+     "gust": 10.5,
+     "kn": 5.8,
+     "t": "2026-11-01T13:00:00.000Z"
+    },
+    {
+     "dir": 58,
+     "gust": 10.9,
+     "kn": 8.9,
+     "t": "2026-11-01T14:00:00.000Z"
+    },
+    {
+     "dir": 49,
+     "gust": 11.2,
+     "kn": 8.8,
+     "t": "2026-11-01T15:00:00.000Z"
     }
    ]
   },
@@ -898,48 +904,6 @@
    "lon": -123.0458,
    "name": "Saturna Island",
    "readings": [
-    {
-     "dir": 357,
-     "gust": 10.7,
-     "kn": 6.7,
-     "t": "2026-10-30T21:00:00.000Z"
-    },
-    {
-     "dir": 37,
-     "gust": 12.0,
-     "kn": 9.2,
-     "t": "2026-10-30T22:00:00.000Z"
-    },
-    {
-     "dir": 35,
-     "gust": 9.9,
-     "kn": 7.8,
-     "t": "2026-10-30T23:00:00.000Z"
-    },
-    {
-     "dir": 48,
-     "gust": 14.1,
-     "kn": 9.2,
-     "t": "2026-10-31T00:00:00.000Z"
-    },
-    {
-     "dir": 58,
-     "gust": 15.6,
-     "kn": 10.7,
-     "t": "2026-10-31T01:00:00.000Z"
-    },
-    {
-     "dir": 63,
-     "gust": 13.2,
-     "kn": 10.4,
-     "t": "2026-10-31T02:00:00.000Z"
-    },
-    {
-     "dir": 60,
-     "gust": 13.7,
-     "kn": 10.0,
-     "t": "2026-10-31T03:00:00.000Z"
-    },
     {
      "dir": 57,
      "gust": 15.6,
@@ -1113,6 +1077,48 @@
      "gust": 12.2,
      "kn": 4.3,
      "t": "2026-11-01T08:00:00.000Z"
+    },
+    {
+     "dir": 286,
+     "gust": 10.2,
+     "kn": 3.5,
+     "t": "2026-11-01T09:00:00.000Z"
+    },
+    {
+     "dir": 268,
+     "gust": 10.4,
+     "kn": 2.9,
+     "t": "2026-11-01T10:00:00.000Z"
+    },
+    {
+     "dir": 262,
+     "gust": 7.8,
+     "kn": 2.0,
+     "t": "2026-11-01T11:00:00.000Z"
+    },
+    {
+     "dir": 274,
+     "gust": 11.6,
+     "kn": 2.4,
+     "t": "2026-11-01T12:00:00.000Z"
+    },
+    {
+     "dir": 270,
+     "gust": 8.2,
+     "kn": 2.3,
+     "t": "2026-11-01T13:00:00.000Z"
+    },
+    {
+     "dir": 321,
+     "gust": 9.3,
+     "kn": 4.2,
+     "t": "2026-11-01T14:00:00.000Z"
+    },
+    {
+     "dir": 346,
+     "gust": 9.3,
+     "kn": 5.9,
+     "t": "2026-11-01T15:00:00.000Z"
     }
    ]
   },
@@ -1122,48 +1128,6 @@
    "lon": -123.426,
    "name": "Victoria Int'l",
    "readings": [
-    {
-     "dir": 339,
-     "gust": null,
-     "kn": 4.1,
-     "t": "2026-10-30T21:00:00.000Z"
-    },
-    {
-     "dir": 340,
-     "gust": null,
-     "kn": 4.3,
-     "t": "2026-10-30T22:00:00.000Z"
-    },
-    {
-     "dir": 53,
-     "gust": null,
-     "kn": 8.5,
-     "t": "2026-10-30T23:00:00.000Z"
-    },
-    {
-     "dir": 356,
-     "gust": null,
-     "kn": 4.1,
-     "t": "2026-10-31T00:00:00.000Z"
-    },
-    {
-     "dir": 3,
-     "gust": null,
-     "kn": 4.3,
-     "t": "2026-10-31T01:00:00.000Z"
-    },
-    {
-     "dir": 341,
-     "gust": null,
-     "kn": 3.3,
-     "t": "2026-10-31T02:00:00.000Z"
-    },
-    {
-     "dir": 4,
-     "gust": null,
-     "kn": 4.6,
-     "t": "2026-10-31T03:00:00.000Z"
-    },
     {
      "dir": 257,
      "gust": null,
@@ -1337,6 +1301,48 @@
      "gust": null,
      "kn": 5.2,
      "t": "2026-11-01T08:00:00.000Z"
+    },
+    {
+     "dir": 280,
+     "gust": null,
+     "kn": 4.5,
+     "t": "2026-11-01T09:00:00.000Z"
+    },
+    {
+     "dir": 302,
+     "gust": null,
+     "kn": 3.9,
+     "t": "2026-11-01T10:00:00.000Z"
+    },
+    {
+     "dir": 270,
+     "gust": null,
+     "kn": 4.5,
+     "t": "2026-11-01T11:00:00.000Z"
+    },
+    {
+     "dir": 286,
+     "gust": null,
+     "kn": 3.7,
+     "t": "2026-11-01T12:00:00.000Z"
+    },
+    {
+     "dir": 285,
+     "gust": null,
+     "kn": 2.7,
+     "t": "2026-11-01T13:00:00.000Z"
+    },
+    {
+     "dir": 272,
+     "gust": null,
+     "kn": 3.5,
+     "t": "2026-11-01T14:00:00.000Z"
+    },
+    {
+     "dir": 274,
+     "gust": null,
+     "kn": 4.1,
+     "t": "2026-11-01T15:00:00.000Z"
     }
    ]
   }
@@ -1345,48 +1351,54 @@
   "haro": {
    "area": "Haro Strait",
    "extended": {
-    "text": "Monday: Wind light. Tuesday: Wind northerly 10 knots becoming light late in the day. Wednesday: Wind light becoming southeast 15 knots late in the day."
+    "text": "Tuesday: Wind northerly 10 knots becoming light in the afternoon. Wednesday: Wind light becoming southeast 15 knots late in the day. Thursday: Wind southeast 15 knots diminishing to southwest 10."
    },
    "forecast": {
-    "text": "Tonight and Sunday.: Wind northerly 10 knots becoming light Sunday afternoon."
+    "text": "Today Tonight and Monday.: Wind northerly 10 knots becoming light this afternoon. Wind light tonight and Monday."
    },
-   "issued": "2026-11-01T04:32:00Z",
+   "issued": "2026-11-01T11:01:00Z",
    "label": "Haro Strait",
    "notes": "",
-   "published": "2026-11-01T04:32:42Z",
-   "source": "https://hpfx.collab.science.gc.ca/20261101/WXO-DD/marine_weather/pacific/04/20261101T043242.819Z_MSC_MarineWeather_m0000064_en.xml",
+   "published": "2026-11-01T11:01:24Z",
+   "source": "https://hpfx.collab.science.gc.ca/20261101/WXO-DD/marine_weather/pacific/11/20261101T110124.692Z_MSC_MarineWeather_m0000064_en.xml",
    "warnings": [],
    "waves": ""
   },
   "jdf": {
    "area": "Juan de Fuca Strait - east entrance",
    "extended": {
-    "text": "Monday: Wind east 10 to 20 knots. Tuesday: Wind east 10 to 20 knots. Wednesday: Wind east 5 to 15 knots increasing to east 15 to 25 late in the day."
+    "text": "Tuesday: Wind east 10 to 20 knots. Wednesday: Wind east 5 to 15 knots increasing to east 15 to 25 late in the day. Thursday: Wind west 10 knots increasing to southeast 20 to 30 late in the day."
    },
    "forecast": {
-    "text": "Tonight and Sunday.: Wind light tonight and Sunday."
+    "text": "Today Tonight and Monday.: Wind light increasing to easterly 10 to 20 knots near midnight. Wind easterly 10 to 20 Monday. Showers Monday afternoon."
    },
-   "issued": "2026-11-01T04:32:00Z",
+   "issued": "2026-11-01T11:01:00Z",
    "label": "Juan de Fuca Strait — east entrance",
    "notes": "",
-   "published": "2026-11-01T04:32:32Z",
-   "source": "https://hpfx.collab.science.gc.ca/20261101/WXO-DD/marine_weather/pacific/04/20261101T043232.840Z_MSC_MarineWeather_m0000009_en.xml",
-   "warnings": [],
+   "published": "2026-11-01T11:01:14Z",
+   "source": "https://hpfx.collab.science.gc.ca/20261101/WXO-DD/marine_weather/pacific/11/20261101T110114.714Z_MSC_MarineWeather_m0000009_en.xml",
+   "warnings": [
+    {
+     "cat": "marine",
+     "text": "Strong wind warning",
+     "title": "Strong wind warning"
+    }
+   ],
    "waves": ""
   },
   "sog": {
    "area": "Strait of Georgia - south of Nanaimo",
    "extended": {
-    "text": "Monday: Wind southeast 5 to 15 knots becoming light late in the day. Tuesday: Wind light becoming northwest 5 to 15 knots late in the day. Wednesday: Wind southeast 5 to 15 knots increasing to southeast 15 to 25."
+    "text": "Tuesday: Wind light becoming northwest 5 to 15 knots in the afternoon. Wednesday: Wind southeast 10 to 15 knots increasing to southeast 15 to 25. Thursday: Wind southeast 15 to 25 knots diminishing to south 10 to 15."
    },
    "forecast": {
-    "text": "Tonight and Sunday.: Wind northwest 10 to 20 knots becoming northwest 10 early Sunday morning then becoming light near noon Sunday. Wind becoming southeast 10 Sunday evening."
+    "text": "Today Tonight and Monday.: Wind northwest 10 to 20 knots becoming northwest 10 early this morning then becoming light near noon. Wind becoming southeast 10 late this evening then becoming light near noon Monday."
    },
-   "issued": "2026-11-01T04:32:00Z",
+   "issued": "2026-11-01T11:01:00Z",
    "label": "Strait of Georgia — south of Nanaimo",
    "notes": "",
-   "published": "2026-11-01T04:32:22Z",
-   "source": "https://hpfx.collab.science.gc.ca/20261101/WXO-DD/marine_weather/pacific/04/20261101T043222.817Z_MSC_MarineWeather_m0000028_en.xml",
+   "published": "2026-11-01T11:01:34Z",
+   "source": "https://hpfx.collab.science.gc.ca/20261101/WXO-DD/marine_weather/pacific/11/20261101T110134.706Z_MSC_MarineWeather_m0000028_en.xml",
    "warnings": [],
    "waves": ""
   }
