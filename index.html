@@ -174,6 +174,8 @@ table.periods th{text-align:left;padding:5px 10px 5px 0;color:var(--faint);
 table.periods td{padding:7px 10px 7px 0;border-bottom:1px solid var(--rule);
   color:var(--dim);vertical-align:top}
 table.periods td.kn{font-family:var(--mono);color:var(--text);white-space:nowrap}
+table.periods .vb{display:block;font:500 10px var(--cond);letter-spacing:.12em;
+  text-transform:uppercase;opacity:.85;margin-top:2px}
 table.periods td.src{color:var(--faint);font-size:12px}
 table.periods tr:last-child td{border-bottom:0}
 ul.outside{margin:9px 0 0;padding-left:20px;color:var(--dim);font:400 14px/1.7 var(--sans)}
@@ -2650,8 +2652,14 @@ function renderSoFar(route, ev){
       angGap((o.deg + 180) % 360, setDeg) >= WAC.oppositionDeg;
     if(obsOpposed) obsHs = currentSteepening(obsHs, sea.tp, Math.abs(l.cur)).hs;
     const e = eff(l);
-    rows.push({ hh:h.hh, obsKn:o.kn, obsDir:o.dir, legKn, obsHs,
-                fcKn:e.wind, fcHs:e.hs, scaled:e.scaled, opp:obsOpposed });
+    /* Band the measured sea with the same rule the forecast is banded by, so
+       the two verdicts are directly comparable. The gust proxy mirrors the
+       forecast side: measured gust where the station reports one, otherwise
+       the mean, both put through the leg's shelter. */
+    const legGust = (o.gust == null ? o.kn : o.gust) * (l.shelter || 1);
+    const obsBand = bandFor(obsHs, legGust);
+    rows.push({ hh:h.hh, obsKn:o.kn, obsDir:o.dir, legKn, obsHs, obsBand,
+                fcKn:e.wind, fcHs:e.hs, fcBand:e.band, scaled:e.scaled, opp:obsOpposed });
   });
   if(rows.length < 2) return "";
 
@@ -2662,14 +2670,26 @@ function renderSoFar(route, ev){
   const dir = mHs > 0.04 ? "smaller" : mHs < -0.04 ? "bigger" : "about what was predicted";
   const tone = mHs > 0.04 ? "good" : mHs < -0.04 ? "bad" : "";
 
-  const body = rows.map(r => `<tr>
+  const RANK = { green:0, yellow:1, red:2 };
+  const body = rows.map(r => {
+    const harsher = RANK[r.fcBand] > RANK[r.obsBand];
+    const softer  = RANK[r.fcBand] < RANK[r.obsBand];
+    return `<tr>
     <td>${esc(pretty(r.hh))}</td>
     <td class="kn">${esc(r.obsDir||"")} ${Math.round(r.obsKn)} kn</td>
-    <td class="kn">${r.obsHs.toFixed(2)} m</td>
-    <td class="kn">${r.fcHs.toFixed(2)} m</td>
-    <td class="${r.fcHs - r.obsHs > 0.05 ? "good" : r.obsHs - r.fcHs > 0.05 ? "bad" : ""}">${
-      (r.fcHs - r.obsHs > 0 ? "+" : "")}${(r.fcHs - r.obsHs).toFixed(2)}</td>
-  </tr>`).join("");
+    <td class="kn b-${r.obsBand}">${r.obsHs.toFixed(2)} m
+      <span class="vb">${esc(WORD[r.obsBand])}</span></td>
+    <td class="kn b-${r.fcBand}">${r.fcHs.toFixed(2)} m
+      <span class="vb">${esc(WORD[r.fcBand])}</span></td>
+    <td class="${harsher ? "good" : softer ? "bad" : ""}">${
+      (r.fcHs - r.obsHs > 0 ? "+" : "")}${(r.fcHs - r.obsHs).toFixed(2)}${
+      harsher ? " <span class=\"vb\">called worse</span>"
+      : softer ? " <span class=\"vb\">called better</span>" : ""}</td>
+  </tr>`;}).join("");
+
+  const harsherN = rows.filter(r => RANK[r.fcBand] > RANK[r.obsBand]).length;
+  const softerN  = rows.filter(r => RANK[r.fcBand] < RANK[r.obsBand]).length;
+  const agreeN   = rows.length - harsherN - softerN;
 
   const first = rows[0], last = rows[rows.length-1];
   return `<h2>Today so far &mdash; measured against predicted</h2>
@@ -2684,6 +2704,14 @@ function renderSoFar(route, ev){
           : mHs < -0.04
           ? "The water has been rougher than predicted. Do not lean on the figures ahead."
           : "Prediction and water have been tracking each other."}</div>
+      <div class="w">On the verdict itself: <strong>${agreeN}</strong> of ${rows.length} hours
+        matched, <strong class="good">${harsherN}</strong> were called worse than the water turned
+        out, <strong class="bad">${softerN}</strong> were called better than it turned out.
+        ${softerN > 0
+          ? "Hours called better than reality are the ones that matter — check those against what you remember of the day."
+          : harsherN > rows.length/2
+          ? "Consistently calling it worse than it was is the bias to carry in your head."
+          : ""}</div>
       <table class="periods">
         <thead><tr><th>Hour</th><th>Measured wind</th><th>Actual sea</th><th>Predicted</th><th>Diff</th></tr></thead>
         <tbody>${body}</tbody></table>
