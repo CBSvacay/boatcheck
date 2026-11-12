@@ -241,6 +241,27 @@ table.periods td.bad{color:var(--stop);font-family:var(--mono)}
   font:400 12px var(--sans)!important;box-shadow:none!important}
 .leaflet-control-layers label{margin:0;cursor:pointer}
 .mm{box-sizing:border-box}
+.mm.lg.band-green{border-color:var(--go);background:#10261D}
+.mm.lg.band-yellow{border-color:var(--marg);background:#2A2110}
+.mm.lg.band-red{border-color:var(--stop);background:#2B1512}
+.leaflet-tooltip.lbl-leg{background:transparent;border:0;box-shadow:none;padding:0}
+.leaflet-tooltip.lbl-leg::before{display:none}
+.leglab{background:rgba(8,15,19,.9);border:1px solid var(--rule-hi);border-radius:3px;
+  padding:3px 7px;text-align:center;white-space:nowrap;line-height:1.35}
+.leglab b{display:block;font:500 13px var(--mono);color:var(--text)}
+.leglab span{display:block;font:400 11px var(--sans);color:var(--dim)}
+.leglab.b-green{border-color:var(--go)}
+.leglab.b-yellow{border-color:var(--marg)}
+.leglab.b-red{border-color:var(--stop)}
+.windlab,.curlab{position:absolute;transform:translate(-50%,-150%);white-space:nowrap;
+  background:rgba(8,15,19,.88);border-radius:2px;padding:1px 5px;
+  font:500 10px var(--mono);letter-spacing:.02em}
+.windlab{color:var(--marg)}
+.curlab{color:var(--mark);transform:translate(-50%,40%)}
+.curlab.opp{color:var(--stop)}
+.maplegend .mk.bg{border:1.5px solid var(--go);border-radius:50%;background:#10261D}
+.maplegend .mk.bm{border:1.5px solid var(--marg);border-radius:50%;background:#2A2110}
+.maplegend .mk.br{border:1.5px solid var(--stop);border-radius:50%;background:#2B1512}
 .mm.hm{width:13px;height:13px;background:var(--go);border:1.5px solid #06141a}
 .mm.st{width:12px;height:12px;background:var(--marg);border:1.5px solid #06141a;
   transform:rotate(45deg)}
@@ -911,6 +932,77 @@ function parseAtom(xmlText){
   return b;
 }
 
+/* Relays hand back whatever they feel like — raw XML from one, markdown from
+   another. Anything that is not parseable XML goes through the text reader
+   below, which is also what reads the plain HTML forecast page. */
+function stripRelayPreamble(t){
+  return (t||"")
+    .replace(/^\s*Title:.*$/im, "")
+    .replace(/^\s*URL Source:.*$/im, "")
+    .replace(/^\s*Published Time:.*$/im, "")
+    .replace(/^\s*Markdown Content:\s*$/im, "")
+    .replace(/\r/g, "");
+}
+
+/* Reads a bulletin out of plain text — the marine forecast web page, or a
+   relay's markdown rendering of the Atom feed. Built on the wording rather
+   than the markup, which is what makes it survive both. */
+function parseBulletinText(raw){
+  const t = stripRelayPreamble(raw)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/[ \t]+/g, " ");
+  const flat = t.replace(/\n+/g, "\n");
+
+  const issuedM = flat.match(/Issued\s+\d{1,2}:\d{2}\s*(?:AM|PM)?\s*[A-Z]{2,4}\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}/i);
+  const issued = issuedM ? issuedM[0] : null;
+  if(!issued) throw new Error("no issue time");
+
+  const warnM = flat.match(/\b([A-Za-z][A-Za-z \-]{0,30}?(?:WARNING|WATCH)\s+IN\s+EFFECT)/i);
+  const warnings = warnM
+    ? [{ title: warnM[1].toUpperCase().replace(/\s+/g," ").trim(),
+         cat: "Marine Warnings and Watches", text: issued }]
+    : [];
+
+  // The period heading: "Tonight and Thursday.", "Today Tonight and Sunday."
+  const periodM = flat.match(/\b((?:Today\s+)?(?:Tonight)?(?:\s*and\s*)?(?:Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)\.)/i)
+               || flat.match(/\b(Today[^.]{0,40}\.)/i);
+  const period = periodM ? periodM[1].trim() : "";
+
+  /* Every sentence that states a wind, up to where the extended forecast
+     starts. Taking them by wording rather than position means a changed page
+     layout does not silently produce an empty forecast. */
+  const extIdx = flat.search(/Extended Forecast/i);
+  const main = extIdx > 0 ? flat.slice(0, extIdx) : flat;
+  const windSentences = (main.match(/\bWind\s[^.]*\./gi) || [])
+    .map(x => x.replace(/\s+/g," ").trim())
+    .filter(x => /\d/.test(x));
+  if(!windSentences.length) throw new Error("no wind wording");
+
+  // "Friday Wind southeast 15 to 25 knots." / "Friday: Wind ..."
+  const extText = extIdx > 0 ? flat.slice(extIdx) : "";
+  const extDays = [...extText.matchAll(
+    /\b(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)\s*:?\s*(Wind[^.]*\.)/gi)]
+    .map(m => `${m[1]}: ${m[2].replace(/\s+/g," ").trim()}`);
+
+  return {
+    warnings,
+    forecast: { title: `Forecast for ${period || "today"}`,
+                text: `${windSentences.join(" ")} ${issued}` },
+    extended: extDays.length
+      ? { title: "Extended Forecast", text: `${extDays.join(" ")} ${issued}` }
+      : null
+  };
+}
+
+function parseAtomOrText(raw){
+  try{
+    const b = parseAtom(raw);
+    if(b.forecast || b.warnings.length) return b;
+  }catch(e){ /* fall through to the text reader */ }
+  return parseBulletinText(raw);
+}
+
 function cachedZone(zone){
   try{
     const c = JSON.parse(localStorage.getItem("ec_bulletin_"+zone) || "null");
@@ -927,24 +1019,34 @@ function cachedZone(zone){
 /* Fetch one zone. weather.gc.ca sends no CORS header, so the direct call fails
    in a browser and two public relays are raced alongside it. */
 async function fetchZone(zone){
-  const feed = zoneAtom(zone);
-  const routes = [
-    ["direct", feed],
-    ["via r.jina.ai", "https://r.jina.ai/" + feed],
-    ["via allorigins", "https://api.allorigins.win/raw?url=" + encodeURIComponent(feed)]
+  const feed = zoneAtom(zone), page = zonePage(zone);
+  const relay = u => [
+    ["direct", u, 0],
+    ["via allorigins", "https://api.allorigins.win/raw?url=" + encodeURIComponent(u), 1],
+    ["via r.jina.ai", "https://r.jina.ai/" + u, 2]
   ];
-  const attempt = async ([label, url]) => {
+  /* Both the Atom feed and the ordinary forecast page carry the same
+     bulletin. The page is tried too because relays often hand back markdown,
+     which is useless as XML but perfectly readable as text — and because the
+     page is the one that demonstrably comes through. */
+  const candidates = [
+    ...relay(feed).map(([l,u]) => [l + " (feed)", u, parseAtomOrText]),
+    ...relay(page).map(([l,u]) => [l + " (page)", u, parseBulletinText])
+  ];
+
+  const attempt = async ([label, url, parse]) => {
     const ctl = new AbortController();
     const timer = setTimeout(()=>ctl.abort(), 14000);
     try{
       const r = await fetch(url, {cache:"no-store", signal:ctl.signal});
       if(!r.ok) throw new Error("HTTP "+r.status);
-      const b = parseAtom(await r.text());
-      b.src = label === "direct" ? "live from Environment Canada" : "live, " + label;
+      const b = parse(await r.text());
+      if(!b.forecast && !b.warnings.length) throw new Error("empty bulletin");
+      b.src = label.startsWith("direct") ? "live from Environment Canada" : "live, " + label;
       return b;
     } finally { clearTimeout(timer); }
   };
-  const b = await Promise.any(routes.map(attempt));
+  const b = await Promise.any(candidates.map(attempt));
   try{ localStorage.setItem("ec_bulletin_"+zone, JSON.stringify({at:Date.now(), data:b})); }catch(e){}
   return b;
 }
@@ -1340,7 +1442,7 @@ const WD_SPAN = { morning:[5,12], afternoon:[12,18], evening:[18,24], night:[18,
 const WD_RX = /\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b(?:\s+(morning|afternoon|evening|night))?/i;
 
 /* Clauses are split at the words Environment Canada uses to change state. */
-const CONNECTIVE = /\b(?:becoming|diminishing(?: to)?|increasing(?: to)?|easing(?: to)?|rising(?: to)?|building(?: to)?|strengthening(?: to)?|veering(?: to)?|backing(?: to)?|then|except)\b/ig;
+const CONNECTIVE = /\b(?:becoming|diminishing(?: to)?|increasing(?: to)?|easing(?: to)?|rising(?: to)?|building(?: to)?|strengthening(?: to)?|veering(?: to)?|backing(?: to)?|then to|and to|then|except)\b/ig;
 
 const dayFloor = ms => { const d = new Date(ms); d.setHours(0,0,0,0); return d.getTime(); };
 const atHour = (dayMs, h) => { const d = new Date(dayFloor(dayMs)); d.setHours(h); return d.getTime(); };
@@ -2407,7 +2509,7 @@ function mapData(route, ev, focusHH){
    Model data cannot see warnings; this can. */
 /* What the stations are reading now, set against the forecast for this hour.
    This is the panel that answers "is the forecast running high today?" */
-function renderObs(ev, zones){
+function renderObs(ev, zones, route){
   const names = { kelp:"Kelp Reefs", saturna:"Saturna Island", discovery:"Discovery Island",
                   yyj:"Victoria Airport", racerocks:"Race Rocks", esquimalt:"Esquimalt" };
 
@@ -2466,10 +2568,43 @@ function renderObs(ev, zones){
       ${esc(refName)} is currently reading <strong>${ref.kn} kn</strong>.</div>`;
   }
 
+  /* The direct wave comparison: the measured wind put through this route's
+     most exposed leg, set against what the page is predicting for the same
+     leg at the nearest hour. Wind is the input; the wave is what you feel. */
+  let waveLine = "";
+  if(ref && route && route.legs && route.legs.length){
+    const legIdx = route.legs.reduce((best, l, i, arr) =>
+      Math.max(...Object.values(l.fetch)) > Math.max(...Object.values(arr[best].fetch)) ? i : best, 0);
+    const leg = route.legs[legIdx];
+    const deg = degFromPoint(ref.dir);
+    const near = ev.hours.reduce((b, hh) =>
+      !b || Math.abs(hh.ms - Date.now()) < Math.abs(b.ms - Date.now()) ? hh : b, null);
+    const l = near ? near.legs[legIdx] : null;
+    if(deg != null && l){
+      const sea = fetchLimitedSea(ref.kn * (l.shelter || 1), fetchMetres(leg, deg));
+      let obsHs = sea.hs;
+      const setDeg = l.cur >= 0 ? leg.floodSet : (leg.floodSet + 180) % 360;
+      if(Math.abs(l.cur) >= WAC.minCurrentKn &&
+         angGap((deg + 180) % 360, setDeg) >= WAC.oppositionDeg)
+        obsHs = currentSteepening(obsHs, sea.tp, Math.abs(l.cur)).hs;
+      const fcHs = eff(l).hs;
+      const gap = fcHs - obsHs;
+      const tone = gap > 0.05 ? "good" : gap < -0.05 ? "bad" : "";
+      const sameDay = dayFloor(near.ms) === dayFloor(Date.now());
+      waveLine = `<div class="w"><strong>On ${esc(leg.name)}</strong> that measured wind works out to
+        <strong class="${tone}">${obsHs.toFixed(2)} m</strong>${sameDay
+          ? `, against the <strong>${fcHs.toFixed(2)} m</strong> this page is showing for
+             ${esc(pretty(near.hh))} &mdash; a difference of
+             <strong class="${tone}">${gap > 0 ? "" : "&minus;"}${Math.abs(gap).toFixed(2)} m</strong>.`
+          : ` right now. The day you are planning is showing ${fcHs.toFixed(2)} m at its nearest hour.`}
+        Same fetch and the same current steepening as the prediction &mdash; only the wind differs.</div>`;
+    }
+  }
+
   return `<div class="bulletin">
     <span class="lbl">What the stations are reading${OBSV.stale && OBSV.ageMin != null
       ? ` &mdash; ${OBSV.ageMin} min old` : ""}</span>
-    ${verdict}
+    ${verdict}${waveLine}
     <table class="periods"><thead><tr><th>Station</th><th>Wind</th><th></th><th>Observed</th></tr></thead>
       <tbody>${rows}</tbody></table>
     <div class="w" style="color:var(--faint);font-size:13px">Measurements, not predictions. Where
@@ -2616,8 +2751,10 @@ function renderStationMap(route, ev, focusHH, win){
       ${t.label} &nbsp;<span>${pretty(t.hh)}</span></button>`).join("")}</div>` : ""}
   <div id="stationmap" class="leafmap"></div>
   <div class="maplegend">
+    <span><i class="mk bg"></i>Go</span>
+    <span><i class="mk bm"></i>Marginal</span>
+    <span><i class="mk br"></i>Don't</span>
     <span><i class="mk st"></i>Weather station</span>
-    <span><i class="mk lg"></i>Leg of your route</span>
     <span><i class="mk hm"></i>Launch ramp</span>
     <span><i class="mk aw"></i>Wind, blowing toward</span>
     <span><i class="mk ac"></i>Current, setting toward</span>
@@ -2701,8 +2838,18 @@ function initStationMap(route, ev, focusHH){
   // legs, with wind and current arrows
   route.legs.forEach((lg,i) => {
     const s = hour ? hour.legs[i] : null;
+    const e = s ? eff(s) : null;
+    // Colour the leg by its verdict so the map reads at a glance, and hang the
+    // wave height and wind on it permanently rather than hiding them in a popup.
+    const band = s ? s.band : "none";
+    const lab = e
+      ? `<div class="leglab b-${band}"><b>${e.hs.toFixed(2)} m</b>
+           <span>${sectorFor(s.from)} ${Math.round(e.wind)}${e.scaled?"*":""} kn</span></div>`
+      : "";
     L.marker([lg.lat, lg.lon], {icon:L.divIcon({className:"", iconSize:[22,22],
-      html:`<div class="mm lg">${i+1}</div>`})}).addTo(MAP)
+      html:`<div class="mm lg band-${band}">${i+1}</div>`})}).addTo(MAP)
+      .bindTooltip(lab, {permanent:true, direction:"bottom", offset:[0,12],
+                         className:"lbl-leg", opacity:1})
       .bindPopup(`<b>${i+1}. ${esc(lg.name)}</b>` + (s ? `<br>
         Wind ${sectorFor(s.from)} ${Math.round(eff(s).wind)} kn${eff(s).scaled
           ? ` <i>(forecast-scaled; model said ${Math.round(s.wind)})</i>`
@@ -2725,11 +2872,19 @@ function initStationMap(route, ev, focusHH){
         html:`<div class="ah" style="border-bottom-color:${colour};transform:rotate(${brg}deg)"></div>`})})
         .addTo(MAP);
       // arrow tips deliberately NOT added to pts — they'd widen the view for nothing
+      return to;
     };
-    draw((s.from+180)%360, eff(s).wind, 25, "#E0A33E", false);
+    const wTip = draw((s.from+180)%360, eff(s).wind, 25, "#E0A33E", false);
+    if(wTip) L.marker(wTip, {icon:L.divIcon({className:"", iconSize:[0,0],
+      html:`<div class="windlab">${sectorFor(s.from)} ${Math.round(eff(s).wind)} kn</div>`})})
+      .addTo(MAP);
     if(Math.abs(s.cur) >= 0.3){
       const setTo = s.cur >= 0 ? lg.floodSet : (lg.floodSet+180)%360;
-      draw(setTo, Math.abs(s.cur), 3, s.opposed ? "#D8563F" : "#5BC8D4", true);
+      const tip = draw(setTo, Math.abs(s.cur), 3, s.opposed ? "#D8563F" : "#5BC8D4", true);
+      if(tip) L.marker(tip, {icon:L.divIcon({className:"", iconSize:[0,0],
+        html:`<div class="curlab${s.opposed?" opp":""}">${Math.abs(s.cur).toFixed(1)} kn
+               ${s.cur >= 0 ? "flood" : "ebb"}${s.opposed?" &middot; against the wind":""}</div>`})})
+        .addTo(MAP);
     }
   });
 
@@ -2787,7 +2942,7 @@ function render(ev, win, model){
 
   ev.window = win || {};
   h += renderBulletin(ev);
-  h += renderObs(ev, route.zones);
+  h += renderObs(ev, route.zones, route);
 
   if(TIDE_ERR) h += `<div class="note warn"><strong>Tides unavailable</strong> — ${esc(TIDE_ERR)}.
     Wind and wave figures below are still good, but currents and slack times are missing, so
