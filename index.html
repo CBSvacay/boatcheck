@@ -191,6 +191,14 @@ ul.outside strong{color:var(--marg)}
 .bulletin .w:first-of-type{margin-top:0}
 .bulletin .w strong{color:var(--text);font-weight:500}
 .bulletin a{color:var(--mark)}
+a.useobs{display:inline-block;margin-top:7px;color:var(--go);border:1px solid var(--go);
+  border-radius:2px;padding:5px 11px;text-decoration:none;font:500 12px var(--cond);
+  letter-spacing:.1em;text-transform:uppercase}
+a.useobs:hover{background:rgba(79,178,134,.12)}
+.bulletin strong.good{color:var(--go)}
+.bulletin strong.bad{color:var(--stop)}
+table.periods td.good{color:var(--go);font-family:var(--mono)}
+table.periods td.bad{color:var(--stop);font-family:var(--mono)}
 
 .maptabs{display:flex;gap:8px;margin:0 0 10px}
 .mtab{background:var(--panel);color:var(--dim);border:1px solid var(--rule-hi);border-radius:2px;
@@ -953,6 +961,251 @@ async function loadBulletins(zones){
   } else {
     BULLETIN = null;
   }
+}
+
+/* ---------- What the stations are actually reading ----------
+
+   A forecast is a prediction for a whole zone. The stations are measurements.
+   When the two disagree — and around here the forecast often runs high — the
+   measurement is the one that tells you whether to hitch up. */
+
+const OBS_SUMMARY = "https://weather.gc.ca/marine/weatherConditions-regionalSummary_e.html?mapID=03&siteID=06100&stationID=WZO";
+const OBS_TTL_MIN = 20;
+let OBSV = null, OBS_ERR = null, OBS_PENDING = false;
+
+/* Which page names map to which station in LINKS. Matched loosely because
+   the summary page's wording is not identical to ours. */
+const OBS_MATCH = {
+  kelp:      ["kelp reefs"],
+  saturna:   ["saturna"],
+  discovery: ["discovery island"],
+  yyj:       ["victoria int", "victoria international", "victoria airport"],
+  racerocks: ["race rocks"],
+  esquimalt: ["esquimalt"]
+};
+
+const norm = t => (t||"").toLowerCase().replace(/[^a-z0-9 ]+/g," ").replace(/\s+/g," ").trim();
+
+function matchStationKey(name){
+  const n = norm(name);
+  for(const [key, frags] of Object.entries(OBS_MATCH))
+    if(frags.some(f => n.includes(f))) return key;
+  return null;
+}
+
+/* "SW 16 gusts 21", "ESE 19", "Calm", "N/A" */
+function parseWindCell(cell){
+  const t = (cell||"").replace(/\s+/g," ").trim();
+  if(/^(calm)/i.test(t)) return { kn:0, gust:null, dir:null };
+  const m = t.match(/^([NSEW]{1,3}|VRB)\s*(\d{1,3})\b(?:\s*gusts?\s*(\d{1,3}))?/i);
+  if(!m || m[2] == null) return null;
+  const kn = +m[2], gust = m[3] != null ? +m[3] : null;
+  if(kn > 90 || (gust != null && gust > 120)) return null;   // nonsense guard
+  return { kn, gust, dir: /vrb/i.test(m[1]) ? null : m[1].toUpperCase() };
+}
+
+function parseObsTime(text){
+  const m = (text||"").match(/(\d{1,2}):(\d{2})\s*(AM|PM)?\s*[A-Z]{3,4}\s+(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
+  if(!m) return null;
+  const months = ["january","february","march","april","may","june","july",
+                  "august","september","october","november","december"];
+  const mon = months.indexOf(m[5].toLowerCase());
+  if(mon < 0) return null;
+  let hr = +m[1] % 12;
+  if(/pm/i.test(m[3]||"")) hr += 12;
+  return new Date(+m[6], mon, +m[4], hr, +m[2]).getTime();
+}
+
+/* The summary page lists each station as a header row carrying its name and
+   observation time, followed by a data row whose first cell is the wind.
+   Walked structurally, with a plain-text sweep as a backstop in case the
+   markup changes under us. */
+function parseObsPage(html){
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const found = {};
+
+  let cur = null;
+  [...doc.querySelectorAll("tr")].forEach(tr => {
+    const cells = [...tr.children].map(td => (td.textContent||"").replace(/\s+/g," ").trim());
+    if(!cells.length) return;
+    const link = tr.querySelector("a");
+    const linkText = link ? link.textContent.trim() : "";
+    const key = linkText ? matchStationKey(linkText) : null;
+    if(key){ cur = { key, when: parseObsTime(cells.join(" ")) }; return; }
+    if(linkText){ cur = null; return; }           // some other station
+    if(cur){
+      const w = parseWindCell(cells[0]);
+      if(w){ found[cur.key] = { ...w, when: cur.when }; cur = null; }
+    }
+  });
+
+  if(!Object.keys(found).length){
+    // Backstop: read the flattened text and look for "<name> ... DIR NN"
+    const flat = (doc.body ? doc.body.textContent : html).replace(/\s+/g, " ");
+    Object.entries(OBS_MATCH).forEach(([key, frags]) => {
+      for(const f of frags){
+        const i = norm(flat).indexOf(f);
+        if(i < 0) continue;
+        const slice = flat.slice(Math.max(0, i - 10), i + 260);
+        const m = slice.match(/\b([NSEW]{1,3})\s+(\d{1,3})\b(?:\s*gusts?\s*(\d{1,3}))?/);
+        if(m && +m[2] <= 90){
+          found[key] = { kn:+m[2], gust: m[3] ? +m[3] : null, dir:m[1].toUpperCase(),
+                         when: parseObsTime(slice) };
+        }
+        break;
+      }
+    });
+  }
+  return found;
+}
+
+function cachedObs(){
+  try{
+    const c = JSON.parse(localStorage.getItem("ec_obs") || "null");
+    if(!c || !c.at) return null;
+    const ageMin = (Date.now() - c.at)/60000;
+    if(ageMin > 180) return null;
+    return { ...c.data, ageMin: Math.round(ageMin), stale: ageMin > OBS_TTL_MIN };
+  }catch(e){ return null; }
+}
+
+async function loadObs(){
+  const routes = [
+    ["direct", OBS_SUMMARY],
+    ["via r.jina.ai", "https://r.jina.ai/" + OBS_SUMMARY],
+    ["via allorigins", "https://api.allorigins.win/raw?url=" + encodeURIComponent(OBS_SUMMARY)]
+  ];
+  const attempt = async ([, url]) => {
+    const ctl = new AbortController();
+    const timer = setTimeout(()=>ctl.abort(), 14000);
+    try{
+      const r = await fetch(url, {cache:"no-store", signal:ctl.signal});
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const got = parseObsPage(await r.text());
+      if(!Object.keys(got).length) throw new Error("no stations found");
+      return got;
+    } finally { clearTimeout(timer); }
+  };
+  try{
+    const stations = await Promise.any(routes.map(attempt));
+    OBSV = { stations, at: Date.now(), ageMin: 0, stale: false };
+    OBS_ERR = null;
+    try{ localStorage.setItem("ec_obs", JSON.stringify({at:Date.now(), data:{stations}})); }catch(e){}
+    logObservations(stations);
+  }catch(agg){
+    const first = agg && agg.errors && agg.errors[0];
+    OBS_ERR = first ? (first.name === "AbortError" ? "timed out" : first.message) : "unavailable";
+    OBSV = cachedObs();
+  }
+}
+
+/* ---------- Scoring the forecast against what happened ----------
+
+   Two rolling logs in this browser. Every run records the forecast figure for
+   each upcoming hour; every observation fetch records what the stations were
+   actually reading. Once an hour has passed, the two can be matched and the
+   forecast's bias measured — which is the only honest way to answer "does the
+   forecast run high here?" for your water rather than in general.
+
+   Nothing leaves the browser, and the logs are capped so they cannot grow
+   without bound. */
+
+const LOG_DAYS = 30;
+const FC_LOG = "fc_log", OBS_LOG = "obs_log";
+
+function readLog(key){
+  try{
+    const a = JSON.parse(localStorage.getItem(key) || "[]");
+    if(!Array.isArray(a)) return [];
+    const cut = Date.now() - LOG_DAYS*864e5;
+    return a.filter(r => r && r.t > cut);
+  }catch(e){ return []; }
+}
+function writeLog(key, rows){
+  try{ localStorage.setItem(key, JSON.stringify(rows.slice(-1200))); }catch(e){}
+}
+
+/* One entry per station per observation time — re-running the page does not
+   create duplicates for the same reading. */
+function logObservations(stations){
+  const rows = readLog(OBS_LOG);
+  const seen = new Set(rows.map(r => r.k + "|" + r.t));
+  let added = 0;
+  Object.entries(stations).forEach(([k, o]) => {
+    if(o.kn == null) return;
+    const t = o.when || Date.now();
+    const slot = Math.round(t / 36e5) * 36e5;        // snap to the hour
+    const id = k + "|" + slot;
+    if(seen.has(id)) return;
+    seen.add(id);
+    rows.push({ k, t: slot, kn: o.kn, g: o.gust == null ? null : o.gust });
+    added++;
+  });
+  if(added) writeLog(OBS_LOG, rows.sort((a,b) => a.t - b.t));
+}
+
+/* The forecast figure for each hour of the day being planned, recorded only
+   for hours still in the future so we are scoring a prediction, not a
+   hindsight reading. */
+function logForecast(ev, zones){
+  if(!ev || !ev.hours || !ev.hours.length) return;
+  const OFFP_CACHE = officialPeriods(zones);
+  const rows = readLog(FC_LOG);
+  const seen = new Set(rows.map(r => r.t + "|" + r.z));
+  const z = (zones || []).join("+") || "haro";
+  const now = Date.now();
+  let added = 0;
+  ev.hours.forEach(h => {
+    if(h.ms <= now) return;
+    const slot = Math.round(h.ms / 36e5) * 36e5;
+    const id = slot + "|" + z;
+    if(seen.has(id)) return;
+    /* Prefer the zone forecast's own figure: it describes open water, which
+       is what a mid-strait station measures. Fall back to the most exposed
+       leg only when there is no bulletin. */
+    const off = officialAtHour(OFFP_CACHE, h.ms);
+    const openKn = off ? off.kn : Math.max(...h.legs.map(l => eff(l).wind));
+    if(!isFinite(openKn) || openKn <= 0) return;
+    seen.add(id);
+    rows.push({ t: slot, z, kn: Math.round(openKn*10)/10,
+                src: h.legs.some(l => eff(l).scaled) ? "ec" : "model", madeAt: now });
+    added++;
+  });
+  if(added) writeLog(FC_LOG, rows.sort((a,b) => a.t - b.t));
+}
+
+/* Match past forecasts against what the stations recorded for the same hour.
+   Kelp Reefs is the reference because it sits in open Haro Strait, which is
+   the water a zone forecast is actually describing. */
+function biasReport(){
+  const fc = readLog(FC_LOG), ob = readLog(OBS_LOG);
+  if(!fc.length || !ob.length) return { n:0, pairs:[] };
+  const byHour = {};
+  ob.forEach(o => {
+    if(!["kelp","saturna","discovery"].includes(o.k)) return;
+    (byHour[o.t] = byHour[o.t] || []).push(o);
+  });
+  const pairs = [];
+  fc.forEach(f => {
+    if(f.t > Date.now()) return;
+    const obs = byHour[f.t];
+    if(!obs || !obs.length) return;
+    const best = obs.find(o => o.k === "kelp") || obs[0];
+    if(best.kn == null) return;
+    pairs.push({ t:f.t, fc:f.kn, ob:best.kn, station:best.k, src:f.src,
+                 lead: f.madeAt ? Math.max(0, (f.t - f.madeAt)/36e5) : null });
+  });
+  pairs.sort((a,b) => a.t - b.t);
+  if(!pairs.length) return { n:0, pairs:[] };
+
+  // Median difference rather than mean — one squall should not define the bias.
+  const diffs = pairs.map(p => p.fc - p.ob).sort((a,b) => a-b);
+  const mid = diffs.length >> 1;
+  const medDiff = diffs.length % 2 ? diffs[mid] : (diffs[mid-1] + diffs[mid]) / 2;
+  const over = pairs.filter(p => p.fc > p.ob + 2).length;
+  const under = pairs.filter(p => p.ob > p.fc + 2).length;
+  return { n:pairs.length, pairs, medDiff, over, under,
+           recent: pairs.slice(-8).reverse() };
 }
 
 function cachedBulletins(zones){
@@ -2059,6 +2312,117 @@ function mapData(route, ev, focusHH){
 
 /* The official Environment Canada bulletin, shown above everything else.
    Model data cannot see warnings; this can. */
+/* What the stations are reading now, set against the forecast for this hour.
+   This is the panel that answers "is the forecast running high today?" */
+function renderObs(ev, zones){
+  const names = { kelp:"Kelp Reefs", saturna:"Saturna Island", discovery:"Discovery Island",
+                  yyj:"Victoria Airport", racerocks:"Race Rocks", esquimalt:"Esquimalt" };
+
+  if(OBS_PENDING && !OBSV){
+    return `<div class="bulletin"><span class="lbl">Reading the stations…</span>
+      <div class="w">Fetching what Kelp Reefs and the others are actually recording. The panel
+      will fill in when it arrives.</div></div>`;
+  }
+  if(!OBSV || !OBSV.stations || !Object.keys(OBSV.stations).length){
+    return `<div class="bulletin">
+      <span class="lbl">Live station readings not loaded</span>
+      <div class="w">Could not reach the observation page${OBS_ERR?` (${esc(OBS_ERR)})`:""}, so there
+        is nothing here to check the forecast against.
+        <a href="${LINKS.summary.u}" target="_blank" rel="noopener">Open all stations at once &#8599;</a>
+        &mdash; if the stations are reading well under the forecast, put the real figure in
+        <em>Forecast wind</em>.</div></div>`;
+  }
+
+  const st = OBSV.stations;
+  const keys = Object.keys(st).filter(k => names[k]);
+  const rows = keys.map(k => {
+    const o = st[k];
+    const ago = o.when ? Math.round((Date.now() - o.when)/60000) : null;
+    return `<tr><td>${esc(names[k])}</td>
+      <td class="kn">${o.dir ? esc(o.dir)+" " : ""}${o.kn} kn${o.gust?` g${o.gust}`:""}</td>
+      <td>${esc(windClass(o.kn))}</td>
+      <td class="src">${ago == null ? "" : ago < 90 ? ago+" min ago" : (ago/60).toFixed(1)+" h ago"}</td></tr>`;
+  }).join("");
+
+  /* Compare only against the open-water stations, because that is the water a
+     zone forecast describes. Kelp Reefs first, Saturna as backup. */
+  const ref = st.kelp || st.saturna || st.discovery;
+  const refName = st.kelp ? "Kelp Reefs" : st.saturna ? "Saturna Island"
+                : st.discovery ? "Discovery Island" : null;
+  /* The comparison is anchored to RIGHT NOW, not to the day being planned —
+     otherwise it disappears the moment you look at tomorrow, which is exactly
+     when knowing the forecast's current bias is most useful. */
+  let verdict = "";
+  const nowOff = MANUAL_KN ? null : officialAtHour(officialPeriods(zones), Date.now());
+  if(ref && nowOff){
+    const diff = nowOff.kn - ref.kn;
+    const verb = diff > 3 ? "higher than" : diff < -3 ? "lower than" : "close to";
+    const tone = diff > 3 ? "good" : diff < -3 ? "bad" : "";
+    verdict = `<div class="w">Right now ${esc(nowOff.label || "the forecast")} says
+      <strong>${nowOff.kn} kn</strong> while ${esc(refName)} is reading
+      <strong>${ref.kn} kn</strong> &mdash; the forecast is
+      <strong class="${tone}">${Math.abs(Math.round(diff))} kn ${verb}</strong> the water.
+      ${diff > 3
+        ? `If that bias holds, the figures below are pessimistic.
+           <a href="#" class="useobs" data-kn="${ref.kn}">Recalculate at ${ref.kn} kn &rarr;</a>`
+        : diff < -3
+        ? "The water is windier than forecast. Treat the figures below as optimistic."
+        : "The two agree, so the figures below should be about right."}</div>`;
+  } else if(ref && MANUAL_KN){
+    verdict = `<div class="w">You have set <strong>${MANUAL_KN} kn</strong> by hand;
+      ${esc(refName)} is currently reading <strong>${ref.kn} kn</strong>.</div>`;
+  }
+
+  return `<div class="bulletin">
+    <span class="lbl">What the stations are reading${OBSV.stale && OBSV.ageMin != null
+      ? ` &mdash; ${OBSV.ageMin} min old` : ""}</span>
+    ${verdict}
+    <table class="periods"><thead><tr><th>Station</th><th>Wind</th><th></th><th>Observed</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    <div class="w" style="color:var(--faint);font-size:13px">Measurements, not predictions. Where
+      they disagree with the forecast, they are the ones standing in the water.</div></div>`;
+}
+
+/* How this page's own past forecasts have compared with the stations. */
+function renderAccuracy(){
+  const b = biasReport();
+  if(!b.n){
+    return `<div class="bulletin">
+      <span class="lbl">Forecast track record &mdash; nothing to compare yet</span>
+      <div class="w">Each time you run a check, the figures for the hours ahead are saved in this
+        browser, and each station reading is saved too. Once a few of those hours have passed, this
+        panel will show how the forecast actually did against the water.
+        <br><br>Run it on a few days and it becomes your own bias figure for your own water, rather
+        than a general claim that forecasts run high.</div></div>`;
+  }
+  const dir = b.medDiff > 1.5 ? "high" : b.medDiff < -1.5 ? "low" : "about right";
+  const rows = b.recent.map(pr => {
+    const d = new Date(pr.t);
+    const delta = pr.fc - pr.ob;
+    return `<tr>
+      <td>${d.toLocaleDateString([], {month:"short", day:"numeric"})}
+          ${d.toLocaleTimeString([], {hour:"numeric"})}</td>
+      <td class="kn">${Math.round(pr.fc)} kn</td>
+      <td class="kn">${pr.ob} kn</td>
+      <td class="${delta > 2 ? "good" : delta < -2 ? "bad" : ""}">${delta > 0 ? "+" : ""}${Math.round(delta)}</td>
+    </tr>`;
+  }).join("");
+
+  return `<div class="bulletin">
+    <span class="lbl">Forecast track record &mdash; ${b.n} matched hour${b.n===1?"":"s"}</span>
+    <div class="w">Against the open-water stations, this page's figures have run
+      <strong class="${b.medDiff > 1.5 ? "good" : b.medDiff < -1.5 ? "bad" : ""}">${dir}</strong>
+      by a median of <strong>${Math.abs(b.medDiff).toFixed(0)} kn</strong>.
+      ${b.over} hour${b.over===1?"":"s"} came in calmer than forecast,
+      ${b.under} windier.</div>
+    <table class="periods"><thead><tr><th>Hour</th><th>Forecast</th><th>Actual</th><th>Diff</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    <div class="w" style="color:var(--faint);font-size:13px">${b.n < 12
+      ? "Still a small sample — treat it as a hint, not a correction factor."
+      : "Enough hours now to be worth something. A steady positive number means the forecast reliably over-reads your water."}
+      Nothing here leaves this browser.</div></div>`;
+}
+
 function renderStationMap(route, ev, focusHH, win){
   const {stations} = mapData(route, ev, focusHH);
   if(!stations.length) return "";
@@ -2228,6 +2592,7 @@ function render(ev, win, model){
 
   ev.window = win || {};
   h += renderBulletin(ev);
+  h += renderObs(ev, route.zones);
 
   if(TIDE_ERR) h += `<div class="note warn"><strong>Tides unavailable</strong> — ${esc(TIDE_ERR)}.
     Wind and wave figures below are still good, but currents and slack times are missing, so
@@ -2338,7 +2703,8 @@ function render(ev, win, model){
     route.hazards.map(x=>`<div class="note warn">${esc(x)}</div>`).join("");
 
   const midHH = (ev.hours[Math.floor(ev.hours.length/2)]||{}).hh;
-  h += renderCheat(route, ev)
+  h += renderAccuracy()
+     + renderCheat(route, ev)
      + renderStationMap(route, ev, win ? win.depHH : midHH, win)
      + renderLinks(route);
 
@@ -2352,6 +2718,12 @@ function render(ev, win, model){
     document.querySelectorAll(".mtab").forEach(b => b.classList.remove("on"));
     btn.classList.add("on");
     initStationMap(route, ev, btn.dataset.hh);
+  });
+
+  document.querySelectorAll(".useobs").forEach(a => a.onclick = (e) => {
+    e.preventDefault();
+    $("offwind").value = a.dataset.kn;
+    run();
   });
 
   const rb = document.getElementById("refreshbul");
@@ -2419,11 +2791,14 @@ async function run(e){
         const norm = t => t.slice(0,2)+":00";
         win = evaluateWindow(ev, norm(dep), norm(ret));
       }
+      logForecast(ev, zones);
       render(ev, win, wind.model);
       return true;
     };
 
     const zones = route.zones || ["haro"];
+    OBSV = cachedObs();
+    OBS_PENDING = !OBSV;
     const cached = cachedBulletins(zones);
     if(cached){ BULLETIN = cached; BULLETIN_ERR = null; }
     BULLETIN_PENDING = !cached;
@@ -2432,12 +2807,21 @@ async function run(e){
     // Refresh in the background if anything is missing or past its 15 minutes.
     const needsRefresh = !cached ||
       zones.some(z => !cached.zones[z] || cached.zones[z].stale);
+    const token = ++RUN_TOKEN;
+    const stillCurrent = () =>
+      token === RUN_TOKEN && $("route").value === routeKey && $("day").value === dayISO;
+
     if(needsRefresh){
-      const token = ++RUN_TOKEN;
       loadBulletins(zones).then(() => {
         BULLETIN_PENDING = false;
-        // ignore if the user has since run another check
-        if(token === RUN_TOKEN && $("route").value === routeKey && $("day").value === dayISO) draw();
+        if(stillCurrent()) draw();
+      });
+    }
+    // Station readings are a separate, equally slow fetch — same treatment.
+    if(!OBSV || OBSV.stale){
+      loadObs().then(() => {
+        OBS_PENDING = false;
+        if(stillCurrent()) draw();
       });
     }
   }catch(err){
