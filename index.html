@@ -166,6 +166,18 @@ tr.pick:hover td{background:var(--panel)}
 .unvtag{display:inline-block;font:500 10px var(--cond);letter-spacing:.16em;text-transform:uppercase;
   color:var(--stop);border:1px solid var(--stop);border-radius:2px;padding:2px 6px;
   margin-left:10px;vertical-align:middle}
+table.periods{width:100%;border-collapse:collapse;margin:11px 0 2px;
+  font:400 13px var(--sans)}
+table.periods th{text-align:left;padding:5px 10px 5px 0;color:var(--faint);
+  font:500 10px var(--cond);letter-spacing:.16em;text-transform:uppercase;
+  border-bottom:1px solid var(--rule)}
+table.periods td{padding:7px 10px 7px 0;border-bottom:1px solid var(--rule);
+  color:var(--dim);vertical-align:top}
+table.periods td.kn{font-family:var(--mono);color:var(--text);white-space:nowrap}
+table.periods td.src{color:var(--faint);font-size:12px}
+table.periods tr:last-child td{border-bottom:0}
+ul.outside{margin:9px 0 0;padding-left:20px;color:var(--dim);font:400 14px/1.7 var(--sans)}
+ul.outside strong{color:var(--marg)}
 .bulletin{background:var(--panel);border:1px solid var(--rule-hi);border-left:3px solid var(--rule-hi);
   border-radius:3px;padding:15px 18px;margin:0 0 14px}
 .bulletin.warn{border-color:var(--marg);border-left-color:var(--marg);background:#221A0E}
@@ -276,8 +288,6 @@ footer a{color:var(--mark)}
 <p class="eyebrow">Small boat check</p>
 <h1 id="title">Southern Gulf Islands</h1>
 <p class="sub" id="subtitle">Tulista Park ramp, Sidney &nbsp;·&nbsp; Glastron SX170</p>
-<p class="sub" style="margin-top:-18px;color:var(--faint);font-size:12px">build 2026-08-30f
-  &nbsp;·&nbsp; Brentwood Bay / Saanich Inlet</p>
 
 <form id="controls" autocomplete="off">
   <div class="f">
@@ -290,11 +300,11 @@ footer a{color:var(--mark)}
   </div>
   <div class="f">
     <label for="depart">Leave at</label>
-    <select id="depart"></select>
+    <input type="time" id="depart" step="3600">
   </div>
   <div class="f">
     <label for="ret">Back by</label>
-    <select id="ret"></select>
+    <input type="time" id="ret" step="3600">
   </div>
   <div class="f">
     <label for="offwind">Forecast wind <span class="opt">optional</span></label>
@@ -380,32 +390,6 @@ wind-against-current test.</li>
 any default here.</p>
 </div></details>
 
-<details class="about"><summary>Where the forecast comes from</summary><div class="body">
-<p>Environment Canada retired the marine feed this page used to read. The bulletins are
-still published, but on the <strong>MSC Datamart</strong> &mdash; a server built for programs
-rather than browsers. Two things make that awkward to read from a phone: the files sit in
-folders named by the hour and those folders are deleted as the day rolls over, and a browser
-may refuse to read another site's data at all.</p>
-<p>So a scheduled job fetches it instead. <code>scripts/fetch_bulletin.py</code> runs hourly on
-GitHub, pulls Haro Strait, Juan de Fuca and Strait of Georgia, and commits
-<code>data/bulletin.json</code> into this repo. The page reads that from its own address, where
-nothing can block it.</p>
-<p>The old relay chain is still in the file as a fallback, for a fresh clone where the job
-hasn't run yet. If the stored copy goes more than about seven hours old, the page tries the
-relays again before trusting it.</p>
-<p><strong>Two things the fetcher does deliberately:</strong></p>
-<ul>
-<li>It picks the <em>sub-area</em> you actually boat in. The Juan de Fuca file covers both
-entrances; taking the wrong one could hand you the west entrance's 35 knots on a day the east
-entrance is doing 15.</li>
-<li>It leaves <strong>air temperature out</strong> of the forecast text. The page reads every
-number in that text as a wind speed, so &ldquo;air temperature 22&rdquo; would be read as 22
-knots and could turn a fine day red. Temperature is stored separately.</li>
-</ul>
-<p>If the job stops running, the page keeps working and shows you how old the stored copy is.
-The <em>Forecast wind</em> box remains the manual override throughout.</p>
-</div></details>
-
 <details class="about"><summary>If tides won't load</summary><div class="body">
 <p>The page asks the Canadian Hydrographic Service for tides directly. Some browsers block that
 (CHS doesn't send the header that permits it). If you see the "tides unavailable" warning
@@ -447,64 +431,6 @@ resolve funnelling between the islands. The page tells you which it used.</li>
 <li>Nothing here knows about fog, and fog is what most often catches an open boat with no radar on
 an August morning. Read the visibility line in the official forecast.</li>
 </ul>
-</div></details>
-
-<details class="about"><summary>What changed, and why</summary><div class="body">
-<p>Five updates. The old code for anything risky is kept in comments inside the
-<code>&lt;script&gt;</code> block, so any of it can be put back by hand.</p>
-
-<p><strong>1. Currents no longer read too strong on quiet days.</strong>
-The page used to fetch a single day of tide, then treat that day's biggest current as
-full strength. So a weak neap tide got described exactly like a big spring tide. It now
-pulls eight days and judges the day against that range. Slack <em>times</em> have not
-moved — only the strength, and it will read lower on small-tide days. Expect fewer
-"wind is fighting the tide" flags, and for the ones that remain to mean more.</p>
-
-<p><strong>2. Warnings stop at 48 hours.</strong>
-An Environment Canada warning describes the next day or two, but nothing in the data
-says which days it covers. Previously a warning in effect today would colour a trip
-you were planning for next week. Now:</p>
-<ul>
-<li>Inside 48 hours — the warning applies exactly as before.</li>
-<li>Beyond 48 hours — warnings are not read, not listed and not applied. You get one
-plain message saying so, and nothing else about them.</li>
-<li>Beyond 48 hours, if no official wind figure applies either, the verdict is marked
-<strong>unverified</strong>. Model output only, with nothing checking it. Fine for
-spotting a promising day; not something to commit to.</li>
-</ul>
-<p>The bulletin also no longer reaches past about five days. Day names repeat weekly,
-so "Thursday" in the extended forecast was matching a Thursday eight days out.</p>
-
-<p><strong>3. Times are half-hour slots.</strong>
-Leave-at and back-by are dropdowns now rather than free entry, because the forecast is
-hourly and offering 5:17 would misrepresent the resolution. Pick any :00 or :30 between
-5&nbsp;am and 9:30&nbsp;pm, or leave both blank for best windows. A half-hour still has
-to land on a whole one to be graded, so your departure rounds <em>down</em> and your
-return rounds <em>up</em> — both toward the longer, more exposed day. A 5:30&nbsp;pm
-return is graded against 6&nbsp;pm rather than 5. The plan panel tells you when it has
-done this and which hours it actually used.</p>
-
-<p><strong>4. Weather across the route.</strong>
-Average air temperature, the range, what the sky is doing, rain, and visibility hour by
-hour. With a plan entered it covers your window; without one, the whole day. This data
-was already being downloaded for every leg and hour — it was only being read to spot
-thunderstorms, and thrown away otherwise. Note it is <em>air</em> temperature. The water
-stays around 10–12&nbsp;°C all summer.</p>
-
-<p><strong>5. Two small fixes.</strong>
-The "try again now" link on a stale bulletin was clearing a cache key that didn't exist,
-so it never actually cleared anything — it only appeared to work because the staleness
-check re-fetched anyway. It now clears the real keys. Caching itself is deliberate and
-unchanged: weather.gc.ca is often unreachable, and a stored bulletin with an age warning
-on it beats no bulletin at all. The manual <em>Forecast wind</em> box is untouched and
-remains the fallback when nothing loads. Separately, a leftover from an old rename and a
-piece of text being cleaned twice were tidied up; neither changed what you see.</p>
-
-<p><strong>Worth checking once it's live.</strong> Pick a small-tide day and see whether
-the wind-against-tide flags have thinned out. If they've gone quiet on days that
-genuinely felt fine on the water, that's the first change doing its job. And keep the
-log — what the page said against how the boat actually felt. A season of that beats
-every default in this file.</p>
 </div></details>
 
 <footer>
@@ -660,39 +586,6 @@ const ROUTES = {
      hazards:[
     "Pender Canal is narrow and shallow with a low fixed bridge. Your boat has no air draft problem — depth and current are what matter. The alternative is the long way round via Plumper Sound."
   ]},
-  brentwood: { label: "Brentwood Bay (Saanich Inlet)", nm: 21.0, zones: ["haro","sog"], legs: [
-    { name:"Colburne & Moresby passages", obs:["yyj"], lat:48.6900, lon:-123.3800,
-      cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
-      fetch:{N:4,NE:5,E:6,SE:6,S:4,SW:3,W:3,NW:10} },
-    { name:"Satellite Channel", obs:["yyj","kelp"], lat:48.7200, lon:-123.4500,
-      cur:"sidney", floodSet:100, peakKn:2.0, offsetMin:0,
-      fetch:{N:5,NE:6,E:8,SE:8,S:5,SW:8,W:15,NW:14},
-      note:"The exposed leg of this run. An afternoon westerly funnels out of Sansum Narrows here and the zone forecast underplays it." },
-    { name:"Saanich Inlet", obs:["yyj"], lat:48.6300, lon:-123.4900,
-      cur:"patricia", floodSet:160, peakKn:1.0, offsetMin:0,
-      fetch:{N:12,NE:6,E:2,SE:3,S:14,SW:4,W:2,NW:8},
-      note:"A steep-sided fjord. Almost nothing from the east or west, but it funnels hard north and south. Currents are weak apart from over the sill at the entrance." },
-    { name:"Brentwood Bay approach", obs:["yyj"], lat:48.5780, lon:-123.4700,
-      cur:"patricia", floodSet:160, peakKn:0.8, offsetMin:0,
-      fetch:{N:10,NE:5,E:2,SE:2,S:6,SW:3,W:2,NW:6},
-      note:"The Mill Bay ferry crosses your track here. Todd Inlet and Butchart Gardens are a mile further south." }
-  ], cheat:{
-      rule:"Victoria Airport wind ÷ 32 in the inlet from the south, ÷ 35 from the north. Satellite Channel: westerly ÷ 31.",
-      bad:"Westerly in Satellite Channel; northerly or southerly once you're in the inlet",
-      watch:[
-        "Satellite Channel is the only genuinely exposed part. Once you turn south into the inlet you're behind high ground.",
-        "The inlet funnels north and south and blocks everything else — a westerly that's making Satellite Channel unpleasant may be nothing once you're inside.",
-        "The Mill Bay ferry crosses between Brentwood Bay and Mill Bay. Cross square to it.",
-        "42 nm round trip around the top of the peninsula. It is a long day, not a quick run.",
-        "Butchart Gardens is in Todd Inlet just south of Brentwood — shallow, busy, and slow speed."
-      ],
-      bail:"Patricia Bay or Coles Bay inside the inlet, or turn back into Colburne Passage." },
-     links:["haro","sog","summary","tideSidney","tables"],
-     hazards:[
-    "42 nm round trip. At a 15 kn chop cruise that is about 85 minutes each way — fuel with real reserve and start early.",
-    "Currents in Saanich Inlet are weak, but there is a sill at the entrance where the tide runs harder than the rest of the inlet suggests. The figures here are derived from tide height and are indicative only.",
-    "Fetch values for the inlet are chart estimates and have not been checked against the water yet. If a leg reads wrong, those are the first thing to tune."
-  ]},
   ganges: { label: "Ganges Marina, Salt Spring", nm: 19.0, zones: ["haro","sog"], legs: [
     { name:"Colburne & Moresby passages", obs:["yyj"], lat:48.6900, lon:-123.3800,
       cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
@@ -718,7 +611,177 @@ const ROUTES = {
      links:["haro","sog","summary","tideGanges","tideActive","tables"],
      hazards:[
     "38 nm round trip. At a 15 kn chop cruise that is about 80 minutes each way — plan fuel with real reserve."
-  ]}
+  ]},
+
+  /* --- Added destinations. All are public: BC marine provincial parks or
+     Gulf Islands National Park Reserve. Fetch figures are chart estimates and
+     should be tuned once real trips are logged against them. --- */
+
+  rum_island: { label: "Rum Island (Isle-de-Lis Marine Park)", nm: 7.5, zones: ["haro"], legs: [
+    { name:"Sidney Channel crossing", obs:["kelp","yyj"], lat:48.6520, lon:-123.3620,
+      cur:"sidney", floodSet:340, peakKn:2.5, offsetMin:0,
+      fetch:{N:5,NE:8,E:12,SE:35,S:30,SW:3,W:2,NW:6} },
+    { name:"Haro Strait, off Gooch Island", obs:["kelp","saturna"], lat:48.6880, lon:-123.2600,
+      cur:"sidney", floodSet:330, peakKn:2.8, offsetMin:-10,
+      fetch:{N:10,NE:14,E:22,SE:36,S:30,SW:6,W:4,NW:12},
+      note:"You come out from behind Sidney Island into open Haro. The last mile is the exposed one." }
+  ], cheat:{
+      rule:"Kelp Reefs wind ÷ 19 if from the SE. ÷ 35 if from the NW.",
+      bad:"Southeast and east",
+      watch:[
+        "Tiny island, no real shelter at the dock area — it is a day stop, not a refuge.",
+        "You leave the lee of Sidney Island for the last two miles. That is where it gets lumpy.",
+        "Current runs hard between the islets. Cross near slack if the wind is up.",
+        "Close to the border — stay north of it, and carry your papers anyway."
+      ],
+      bail:"Duck back behind Sidney Island, or carry on to Portland." },
+    links:["haro","summary","tideSidney","tables"]},
+
+  russell_island: { label: "Russell Island (Fulford Harbour)", nm: 12.0, zones: ["haro"], legs: [
+    { name:"Colburne & Moresby passages", obs:["yyj"], lat:48.6900, lon:-123.3800,
+      cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
+      fetch:{N:4,NE:5,E:6,SE:6,S:4,SW:3,W:3,NW:10} },
+    { name:"Satellite Channel", obs:["yyj","kelp"], lat:48.7200, lon:-123.4500,
+      cur:"sidney", floodSet:100, peakKn:2.0, offsetMin:0,
+      fetch:{N:5,NE:6,E:8,SE:8,S:5,SW:8,W:15,NW:14},
+      note:"Afternoon westerly funnels out of Saanich Inlet. The zone forecast underplays this." },
+    { name:"Fulford Harbour approach", obs:["yyj","kelp"], lat:48.7480, lon:-123.4290,
+      cur:"fulford", floodSet:300, peakKn:1.5, offsetMin:10,
+      fetch:{N:4,NE:5,E:9,SE:13,S:9,SW:6,W:4,NW:6},
+      note:"Well sheltered. Watch for the Fulford ferry — the channel is narrow and it does not deviate." }
+  ], cheat:{
+      rule:"Satellite Channel westerly ÷ 31. Everything else ÷ 38 or better.",
+      bad:"Afternoon westerly in Satellite Channel",
+      watch:[
+        "A genuinely sheltered run — second only to Portland as a bad-day option.",
+        "The westerly in Satellite Channel builds through the afternoon. Go early, come back early.",
+        "Fulford ferry crosses your track. Give it room; it has right of way in the narrows.",
+        "Russell Island has no dock — you anchor off and go ashore by dinghy."
+      ],
+      bail:"Portland Island, which is on the way home anyway." },
+    links:["haro","summary","tideSidney","tables"]},
+
+  prevost_island: { label: "Prevost Island (James Bay / Selby Cove)", nm: 16.0, zones: ["haro","sog"], legs: [
+    { name:"Colburne & Moresby passages", obs:["yyj"], lat:48.6900, lon:-123.3800,
+      cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
+      fetch:{N:4,NE:5,E:6,SE:6,S:4,SW:3,W:3,NW:10} },
+    { name:"Satellite Channel", obs:["yyj","kelp"], lat:48.7200, lon:-123.4500,
+      cur:"sidney", floodSet:100, peakKn:2.0, offsetMin:0,
+      fetch:{N:5,NE:6,E:8,SE:8,S:5,SW:8,W:15,NW:14} },
+    { name:"Captain Passage", obs:["saturna","kelp"], lat:48.8280, lon:-123.4000,
+      cur:"ganges", floodSet:320, peakKn:2.0, offsetMin:-40,
+      fetch:{N:12,NE:14,E:10,SE:26,S:16,SW:8,W:7,NW:14},
+      note:"Opens northeast toward Trincomali. James Bay is exposed to the northwest — Selby Cove is the better shelter." }
+  ], cheat:{
+      rule:"Kelp Reefs wind ÷ 24 if from the SE. ÷ 32 from the NW.",
+      bad:"Southeast up Captain Passage, northwest into James Bay",
+      watch:[
+        "James Bay looks inviting and is wide open to the northwest. Selby Cove is the all-weather choice.",
+        "Captain Passage funnels a southeasterly. The last two miles are the worst of the trip.",
+        "National park land — no facilities at all. Carry everything in and out.",
+        "16 nm each way. Check fuel against a headwind home, not a calm one."
+      ],
+      bail:"Ganges is four miles on, or tuck into Portland on the way back." },
+    links:["haro","sog","summary","tideGanges","tables"]},
+
+  montague: { label: "Montague Harbour (Galiano)", nm: 19.0, zones: ["haro","sog"], legs: [
+    { name:"Moresby Passage", obs:["yyj","kelp"], lat:48.7000, lon:-123.3600,
+      cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
+      fetch:{N:6,NE:6,E:8,SE:10,S:6,SW:4,W:4,NW:8} },
+    { name:"Swanson Channel crossing", obs:["kelp","saturna"], lat:48.7500, lon:-123.3200,
+      cur:"bedwell", floodSet:310, peakKn:3.5, offsetMin:-35,
+      fetch:{N:8,NE:10,E:12,SE:25,S:20,SW:15,W:6,NW:12} },
+    { name:"Trincomali Channel", obs:["saturna","kelp"], lat:48.8820, lon:-123.3900,
+      cur:"ganges", floodSet:310, peakKn:2.0, offsetMin:-25,
+      fetch:{N:7,NE:6,E:5,SE:24,S:10,SW:5,W:6,NW:28},
+      note:"Long and straight northwest to southeast. Wind from either end has a clear run at you." }
+  ], cheat:{
+      rule:"Kelp Reefs wind ÷ 24 from the SE. ÷ 23 from the NW. Both ends are bad.",
+      bad:"Northwest and southeast — Trincomali runs that way",
+      watch:[
+        "Trincomali is a wind tunnel on both axes. A northwesterly here is as bad as a southeasterly.",
+        "Swanson Channel is the exposed crossing on the way. Get it done early.",
+        "Montague itself is excellent shelter — a mooring buoy field and a big park.",
+        "Active Pass is nearby and runs hard. Do not shortcut through it in a 17-footer without studying the tables."
+      ],
+      bail:"Port Browning on Pender, or back into Swanson and home." },
+    links:["haro","sog","summary","tideActive","tables"]},
+
+  wallace_island: { label: "Wallace Island (Conover Cove)", nm: 22.0, zones: ["haro","sog"], legs: [
+    { name:"Colburne & Moresby passages", obs:["yyj"], lat:48.6900, lon:-123.3800,
+      cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
+      fetch:{N:4,NE:5,E:6,SE:6,S:4,SW:3,W:3,NW:10} },
+    { name:"Satellite Channel", obs:["yyj","kelp"], lat:48.7200, lon:-123.4500,
+      cur:"sidney", floodSet:100, peakKn:2.0, offsetMin:0,
+      fetch:{N:5,NE:6,E:8,SE:8,S:5,SW:8,W:15,NW:14} },
+    { name:"Captain Passage", obs:["saturna","kelp"], lat:48.8280, lon:-123.4000,
+      cur:"ganges", floodSet:320, peakKn:2.0, offsetMin:-40,
+      fetch:{N:12,NE:14,E:10,SE:26,S:16,SW:8,W:7,NW:14} },
+    { name:"Upper Trincomali Channel", obs:["saturna","yyj"], lat:48.9360, lon:-123.5450,
+      cur:"ganges", floodSet:315, peakKn:1.8, offsetMin:-30,
+      fetch:{N:8,NE:7,E:5,SE:30,S:12,SW:5,W:6,NW:26},
+      note:"Thirty kilometres of open channel to the southeast. A SE blow builds a real sea by the time it reaches you." }
+  ], cheat:{
+      rule:"Kelp Reefs wind ÷ 22 from the SE. ÷ 24 from the NW.",
+      bad:"Southeast — thirty kilometres of Trincomali to windward",
+      watch:[
+        "Your longest trip: 22 nm each way, 44 round. This is a full day with no slack in it.",
+        "The upper channel has the longest fetch you will see anywhere on these routes.",
+        "Conover Cove is shallow and the entrance is tight — check the tide before you commit.",
+        "Four legs means four chances for the weather to change. Set a hard turnaround time."
+      ],
+      bail:"Ganges has fuel and a marina, and is well short of Wallace." },
+    links:["haro","sog","summary","tideGanges","tables"]},
+
+  winter_cove: { label: "Winter Cove (Saturna Island)", nm: 16.0, zones: ["haro","sog"], legs: [
+    { name:"Moresby Passage", obs:["yyj","kelp"], lat:48.7000, lon:-123.3600,
+      cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
+      fetch:{N:6,NE:6,E:8,SE:10,S:6,SW:4,W:4,NW:8} },
+    { name:"Swanson Channel crossing", obs:["kelp","saturna"], lat:48.7500, lon:-123.3200,
+      cur:"bedwell", floodSet:310, peakKn:3.5, offsetMin:-35,
+      fetch:{N:8,NE:10,E:12,SE:25,S:20,SW:15,W:6,NW:12} },
+    { name:"Plumper Sound", obs:["saturna","kelp"], lat:48.7760, lon:-123.2060,
+      cur:"bedwell", floodSet:330, peakKn:2.2, offsetMin:-15,
+      fetch:{N:9,NE:12,E:7,SE:20,S:15,SW:5,W:4,NW:10},
+      note:"Opens southeast into Boundary Pass. Saturna East Point is the station that tells you what it is doing." }
+  ], cheat:{
+      rule:"Saturna wind ÷ 27 from the SE. Swanson Channel SE ÷ 24 on the way.",
+      bad:"Southeast out of Boundary Pass",
+      watch:[
+        "Boat Passage at the north end runs to 7 kn and is only safe at slack. Do not try it otherwise.",
+        "Plumper Sound opens to Boundary Pass — a southeasterly comes straight up it.",
+        "Saturna East Point is your best station for this trip, better than Kelp Reefs.",
+        "Winter Cove is good shelter and a provincial park, but it is shallow at the south end."
+      ],
+      bail:"Port Browning on Pender is close and much more sheltered." },
+    links:["haro","sog","summary","tideBedwell","tables"]},
+
+  brentwood_bay: { label: "Brentwood Bay (Saanich Inlet)", nm: 15.0, zones: ["haro"], legs: [
+    { name:"Colburne & Moresby passages", obs:["yyj"], lat:48.6900, lon:-123.3800,
+      cur:"sidney", floodSet:20, peakKn:2.5, offsetMin:0,
+      fetch:{N:4,NE:5,E:6,SE:6,S:4,SW:3,W:3,NW:10},
+      note:"Round the top of the peninsula past Swartz Bay. Four ferry berths — expect wash and watch for departures." },
+    { name:"Satellite Channel", obs:["yyj","kelp"], lat:48.7200, lon:-123.4500,
+      cur:"sidney", floodSet:100, peakKn:2.0, offsetMin:0,
+      fetch:{N:5,NE:6,E:8,SE:8,S:5,SW:8,W:15,NW:14},
+      note:"The westerly out of Saanich Inlet and Sansum Narrows funnels through here in the afternoon." },
+    { name:"Saanich Inlet", obs:["yyj"], lat:48.6200, lon:-123.4950,
+      cur:"fulford", floodSet:180, peakKn:1.0, offsetMin:20,
+      fetch:{N:13,NE:7,E:3,SE:7,S:11,SW:4,W:3,NW:14},
+      note:"A deep fjord, not a strait. Short fetch in every direction, so the seas stay small — but the wind can be far stronger than the Haro Strait forecast suggests." }
+  ], cheat:{
+      rule:"Satellite Channel westerly ÷ 31. In the inlet itself ÷ 33 north–south, ÷ 69 east–west.",
+      bad:"Westerly in Satellite Channel; northwest down the inlet",
+      watch:[
+        "No marine zone forecast covers Saanich Inlet. Haro Strait is the nearest and it is a poor proxy — the inlet makes its own wind.",
+        "On a warm afternoon the inlet draws a thermal inflow that can reach 20 kn with nothing in the forecast to warn you. Mornings are reliably calmer.",
+        "Fetch is short everywhere, so even a strong inflow gives you chop rather than a dangerous sea. Uncomfortable, not usually hazardous.",
+        "Victoria Airport is your only nearby station and it sits on the wrong side of the peninsula. Treat its reading as a hint, not a measurement.",
+        "The Mill Bay ferry crosses the inlet and the Brentwood terminal is right beside the anchorage.",
+        "Fifteen miles each way to go around the peninsula for somewhere you can drive to in twenty minutes. Go for the trip, not the destination."
+      ],
+      bail:"Tod Inlet or Coles Bay — both close and sheltered from the inflow." },
+    links:["haro","summary","tideSidney","tables"]}
 };
 
 /* --------------------------------------------------------------- physics */
@@ -787,15 +850,6 @@ const worseOf = (a,b) => ({green:0,yellow:1,red:2}[a] >= {green:0,yellow:1,red:2
 
 let TIDES = null, TIDE_ERR = null, TIDE_SRC = null;
 let BULLETIN = null, BULLETIN_ERR = null, BULLETIN_PENDING = false, RUN_TOKEN = 0;
-let FORCE_BULLETIN = false;   // set by "Try again now"; never deletes the cache
-/* The bulletin scaling switch. ON is the only safe default, so this is reset
-   to true on every Check — leaving it off by accident would quietly hand back
-   optimistic wave heights with nothing checking them. */
-let USE_BULLETIN = true;
-let REDRAW = null;           // set by run(); lets the switch rebuild from data already in hand
-let WIND_DATA = null;        // kept so the observed-vs-forecast strip can reach the station blocks
-let CURRENTS = null;         // same, so observed seas get the same wind-against-tide treatment
-let FETCH_ERR = null;         // last fetch failure, kept even when a cached copy is used
 let MANUAL_KN = null;   // wind the user typed from the official bulletin
 
 /* Environment Canada marine zones. There is no "Gulf Islands" zone — Haro
@@ -820,86 +874,6 @@ const EC_PAGE = zonePage("haro");
    page says so loudly rather than pretending everything is fine. */
 const BULLETIN_TTL_MIN = 15;      // refresh in the background past this
 const BULLETIN_STALE_MIN = 720;   // 12 h — still far better than no forecast
-
-/* The bulletin committed into this repo by the hourly GitHub Action. This is
-   the reliable path: it comes from our own address, so nothing can block it
-   and no relay is involved. The relay chain below is now only a fallback for
-   when the Action hasn't been set up or hasn't run yet.
-
-   Environment Canada retired the marine feed at weather.gc.ca/rss/marine/,
-   which is why the relays started returning "bad XML" — they were fetching an
-   error page. See scripts/fetch_bulletin.py. */
-/* Must match STATIONS in scripts/fetch_bulletin.py. Codes were pinned there
-   after a name search turned up an air-quality site and an East Point in Nova
-   Scotia. */
-const OBS_STATIONS = {
-  kelp:      {code:"CWZO", name:"Kelp Reefs",        lat:48.5476, lon:-123.2369},
-  saturna:   {code:"CWEZ", name:"Saturna Island",    lat:48.7832, lon:-123.0458},
-  discovery: {code:"CWDR", name:"Discovery Island",  lat:48.4246, lon:-123.2258},
-  racerocks: {code:"CWQK", name:"Race Rocks",        lat:48.2980, lon:-123.5314},
-  esquimalt: {code:"CWPF", name:"Esquimalt Harbour", lat:48.4320, lon:-123.4393},
-  yyj:       {code:"CYYJ", name:"Victoria Int'l",    lat:48.6472, lon:-123.4260}
-};
-
-const REPO_BULLETIN_URL = "data/bulletin.json";
-const REPO_TTL_MIN = 100;    // hourly job plus slack for GitHub's scheduler
-let REPO_BULLETIN;           // undefined = not tried yet, null = not available
-
-async function repoBulletin(){
-  if(REPO_BULLETIN !== undefined) return REPO_BULLETIN;
-  try{
-    const r = await fetch(REPO_BULLETIN_URL, {cache:"no-store"});
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    const j = await r.json();
-    if(!j || !j.zones || !Object.keys(j.zones).length) throw new Error("no zones");
-    REPO_BULLETIN = j;
-  }catch(e){
-    REPO_BULLETIN = null;
-  }
-  return REPO_BULLETIN;
-}
-
-/* Shape a stored zone to look exactly like a parsed feed entry, so everything
-   downstream is unchanged. */
-function zoneFromRepo(repo, z){
-  const zd = repo.zones[z];
-  if(!zd) return null;
-
-  /* Two different ages, and conflating them would be dangerous.
-
-     ageMin is how long since the job last ran — that governs refreshing.
-     issuedAgeMin is how long since Environment Canada actually issued the
-     bulletin. A job running every hour against a server that has fallen
-     behind produces a copy that is minutes old and contains a forecast from
-     yesterday. Reporting only the first would call that fresh. */
-  const genMs = Date.parse(repo.generated || "") || Date.now();
-  const ageMin = Math.max(0, Math.round((Date.now() - genMs)/60000));
-
-  /* Freshness comes from when the file was PUBLISHED, taken from its own
-     filename, not from the lastModifiedTime field inside it. If Environment
-     Canada reissues a forecast whose wording hasn't changed, that field may
-     not move — and an unchanged forecast is still a current one. Judging by
-     it would condemn a perfectly good bulletin.
-
-     Scheduled issues are six hours apart (04, 10, 16, 22 UTC), so six hours
-     old is ordinary. Ten means a whole cycle was missed. */
-  const issMs = Date.parse(zd.published || zd.issued || "");
-  const issuedAgeMin = isFinite(issMs)
-    ? Math.max(0, Math.round((Date.now() - issMs)/60000)) : null;
-  const issuedStale = issuedAgeMin != null && issuedAgeMin > 600;
-
-  return {
-    warnings: zd.warnings || [],
-    forecast: zd.forecast || null,
-    extended: zd.extended || null,
-    waves: zd.waves || "",
-    notes: zd.notes || "",
-    fromRepo: true,
-    src: "refreshed hourly into this repo",
-    issuedAgeMin, issuedStale,
-    ageMin, stale: ageMin > REPO_TTL_MIN, veryStale: ageMin > 4*REPO_TTL_MIN
-  };
-}
 
 function parseAtom(xmlText){
   const xml = new DOMParser().parseFromString(xmlText, "application/xml");
@@ -927,27 +901,20 @@ function cachedZone(zone){
     const ageMin = (Date.now() - c.at)/60000;
     if(ageMin > BULLETIN_STALE_MIN) return null;
     c.data.ageMin = Math.round(ageMin);
-    /* A repo copy is refreshed hourly by design, so judging it against the
-       15-minute relay TTL would flag it as stale almost all the time. */
-    c.data.stale = ageMin > (c.data.fromRepo ? REPO_TTL_MIN : BULLETIN_TTL_MIN);
+    c.data.stale = ageMin > BULLETIN_TTL_MIN;
     c.data.veryStale = ageMin > 180;
     return c.data;
   }catch(e){ return null; }
 }
 
 /* Fetch one zone. weather.gc.ca sends no CORS header, so the direct call fails
-   in a browser and several public relays are raced alongside it. They are free
-   services and go down without notice, so the list is deliberately longer than
-   it needs to be — Promise.any takes whichever answers first. */
+   in a browser and two public relays are raced alongside it. */
 async function fetchZone(zone){
   const feed = zoneAtom(zone);
   const routes = [
     ["direct", feed],
     ["via r.jina.ai", "https://r.jina.ai/" + feed],
-    ["via allorigins", "https://api.allorigins.win/raw?url=" + encodeURIComponent(feed)],
-    ["via corsproxy.io", "https://corsproxy.io/?url=" + encodeURIComponent(feed)],
-    ["via codetabs", "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(feed)],
-    ["via isomorphic-git", "https://cors.isomorphic-git.org/" + feed]
+    ["via allorigins", "https://api.allorigins.win/raw?url=" + encodeURIComponent(feed)]
   ];
   const attempt = async ([label, url]) => {
     const ctl = new AbortController();
@@ -958,15 +925,6 @@ async function fetchZone(zone){
       const b = parseAtom(await r.text());
       b.src = label === "direct" ? "live from Environment Canada" : "live, " + label;
       return b;
-    } catch(e){
-      /* Attach the source name to the failure. Without this the panel reported
-         a bare "Failed to fetch" from whichever route happened to be first,
-         which said nothing about whether the feed, the relays, or the network
-         was at fault. */
-      throw new Error(label + " — " + (
-        e.name === "AbortError" ? "timed out" :
-        /failed to fetch|networkerror|load failed/i.test(e.message) ? "blocked or unreachable" :
-        e.message));
     } finally { clearTimeout(timer); }
   };
   const b = await Promise.any(routes.map(attempt));
@@ -977,29 +935,12 @@ async function fetchZone(zone){
 /* Load every zone a route touches. A failure for one zone keeps whatever was
    cached for it rather than discarding it. */
 async function loadBulletins(zones){
-  FETCH_ERR = null;
-  const repo = await repoBulletin();
   const results = await Promise.all(zones.map(async z => {
-    /* Repo copy first. Only reach for the relays when it has nothing for this
-       zone, or what it has has gone properly stale. */
-    const fromRepo = repo ? zoneFromRepo(repo, z) : null;
-    if(fromRepo && !fromRepo.veryStale){
-      try{ localStorage.setItem("ec_bulletin_"+z,
-        JSON.stringify({at: Date.now() - fromRepo.ageMin*60000, data: fromRepo})); }catch(e){}
-      return [z, fromRepo];
-    }
     try { return [z, await fetchZone(z)]; }
     catch(agg){
-      /* Promise.any rejects with an AggregateError holding every failure. Show
-         them all — one line per source — so a diagnosis is possible without
-         opening the developer console on a phone. */
-      const errs = (agg && agg.errors && agg.errors.length) ? agg.errors : [agg];
-      const msg = errs.map(e => e && e.message).filter(Boolean).join(" · ") || "unavailable";
-      /* Kept separately from BULLETIN_ERR, which gets cleared as soon as any
-         zone resolves from cache. Otherwise a successful fallback would hide
-         the very error needed to work out why the fetch keeps failing. */
-      FETCH_ERR = msg;
-      const fb = cachedZone(z) || (repo ? zoneFromRepo(repo, z) : null);
+      const first = agg && agg.errors && agg.errors[0];
+      const msg = first ? (first.name === "AbortError" ? "timed out" : first.message) : "unavailable";
+      const fb = cachedZone(z);
       if(!fb) BULLETIN_ERR = msg;
       return [z, fb];
     }
@@ -1020,87 +961,283 @@ function cachedBulletins(zones){
   return Object.keys(out).length ? { zones: out } : null;
 }
 
-/* The bulletin covers several days. Grab the sentence(s) for the day actually
-   being planned, so a Sunday trip isn't judged against Saturday's gale. */
+/* ---------- Reading the bulletin as a timeline ----------
+
+   A marine forecast is not one wind figure, it is a sequence of clauses each
+   covering its own stretch of time:
+
+     "Wind southeast 25 to 35 knots diminishing to southeast 15 to 25 early
+      this evening, then variable 5 to 15 later this evening."
+
+   Taking the biggest number in that sentence gives 35 kn — right for 6 pm,
+   badly wrong for 10 pm. And the extended forecast carries whole other days,
+   so a Saturday gale would other wise be applied to a calm Thursday. Every
+   clause below is resolved to real start and end times, and only the ones
+   that actually overlap the trip are used. */
+
 const DAYNAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-/* How far ahead the day being planned is. Warnings describe the next day or
-   two, and the bulletin itself only covers about five days. Beyond those, the
-   honest answer is that it says nothing about your day — not that today's gale
-   applies to it. */
-const WARN_HORIZON_H = 48;
-const BULLETIN_HORIZON_H = 120;
-function hoursOut(dayISO){
-  const noon = new Date(dayISO+"T12:00:00").getTime();
-  return isNaN(noon) ? 1e6 : (noon - Date.now())/36e5;
-}
-const withinWarnHorizon = dayISO => hoursOut(dayISO) <= WARN_HORIZON_H;
+/* Clock spans for Environment Canada's time qualifiers. Hours of 24 or more
+   mean the following day. ECCC does not publish exact hours for these words,
+   so these are the conventional readings, kept deliberately generous at the
+   edges rather than tight. Order matters: most specific first. */
+const TIME_WORDS = [
+  [/\blate (?:this |in the )?morning\b/i,        10, 12],
+  [/\bearly (?:this )?morning\b/i,                5,  8],
+  [/\bthis morning\b/i,                           5, 12],
+  [/\bearly (?:this )?afternoon\b/i,             12, 15],
+  [/\blate (?:this )?afternoon\b/i,              15, 18],
+  [/\bthis afternoon\b/i,                        12, 18],
+  [/\bearly (?:this )?evening\b/i,               18, 21],
+  [/\b(?:late|later) (?:this )?evening\b/i,      21, 24],
+  [/\bthis evening\b/i,                          18, 24],
+  [/\bafter midnight\b/i,                        24, 30],
+  [/\bnear midnight\b/i,                         22, 26],
+  [/\b(?:overnight|tonight)\b/i,                 18, 30],
+  [/\bbefore dawn\b/i,                            3,  7],
+  [/\b(?:late|later) (?:in the day|today)\b/i,   15, 21],
+  [/\bearly (?:in the day|today)\b/i,             5, 11],
+  [/\b(?:midday|near noon)\b/i,                  11, 14],
+  [/\btoday\b/i,                                  5, 18]
+];
+const WD_SPAN = { morning:[5,12], afternoon:[12,18], evening:[18,24], night:[18,30] };
+const WD_RX = /\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b(?:\s+(morning|afternoon|evening|night))?/i;
 
-function zoneForDay(zoneData, dayISO){
-  /* Day names repeat weekly, so "Thursday" in the extended forecast would
-     otherwise match a Thursday eight days out. */
-  if(hoursOut(dayISO) > BULLETIN_HORIZON_H) return null;
-  const want = DAYNAMES[new Date(dayISO+"T12:00:00").getDay()];
-  const today = new Date(); today.setHours(0,0,0,0);
-  const dayOffset = Math.round((new Date(dayISO+"T00:00:00") - today)/864e5);
-  const blocks = [zoneData.forecast?.text || "", zoneData.extended?.text || ""];
-  for(const text of blocks){
-    const named = new RegExp(
-      `(?:${want}\\s*:\\s*([^.]*\\.)|([^.]*\\b${want}\\b[^.]*\\.))`, "i");
-    const m = text.match(named);
-    if(m){
-      const seg = (m[1] || m[2] || "").trim();
-      const kn = officialMaxKn(seg + " knots");
-      if(kn) return {maxKn:kn, text:seg, exact:true};
-    }
-  }
-  if(dayOffset <= 0 && zoneData.forecast){
-    const kn = officialMaxKn(zoneData.forecast.text);
-    if(kn) return {maxKn:kn, text:zoneData.forecast.text, exact:false};
-  }
-  /* Last resort: the strongest figure anywhere in the bulletin. Only honest for
-     a day the bulletin genuinely covers — otherwise a Tuesday gale would be
-     applied to next weekend. */
-  if(!withinWarnHorizon(dayISO)) return null;
-  const kn = officialMaxKn((zoneData.forecast?.text||"") + " " + (zoneData.extended?.text||""));
-  return kn ? {maxKn:kn, text:"", exact:false} : null;
-}
+/* Clauses are split at the words Environment Canada uses to change state. */
+const CONNECTIVE = /\b(?:becoming|diminishing(?: to)?|increasing(?: to)?|easing(?: to)?|rising(?: to)?|building(?: to)?|strengthening(?: to)?|veering(?: to)?|backing(?: to)?|then|except)\b/ig;
 
-/* The strongest wind any zone the route touches gives for that day. Boundaries
-   between zones are not sharp on the water, so the worse figure wins. */
-function officialForDay(dayISO, zones){
-  if(MANUAL_KN)
-    return {maxKn:MANUAL_KN, text:"", label:"the figure you entered", exact:true, manual:true};
-  if(!BULLETIN || !BULLETIN.zones) return null;
-  let best = null;
-  (zones || Object.keys(BULLETIN.zones)).forEach(z => {
-    const zd = BULLETIN.zones[z];
-    if(!zd) return;
-    const r = zoneForDay(zd, dayISO);
-    if(r && (!best || r.maxKn > best.maxKn))
-      best = {...r, label: ZONES[z].name, zone: z};
-  });
-  return best;
+const dayFloor = ms => { const d = new Date(ms); d.setHours(0,0,0,0); return d.getTime(); };
+const atHour = (dayMs, h) => { const d = new Date(dayFloor(dayMs)); d.setHours(h); return d.getTime(); };
+const addDays = (ms, n) => { const d = new Date(dayFloor(ms)); d.setDate(d.getDate()+n); return d.getTime(); };
+
+/* "Issued 4:00 PM PDT 11 November 2026" — the anchor every relative phrase
+   in the bulletin is measured from. Without it nothing can be placed. */
+function parseIssued(text){
+  const m = (text||"").match(/issued\s+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*[A-Z]{3,4}\s+(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
+  if(!m) return null;
+  const months = ["january","february","march","april","may","june","july",
+                  "august","september","october","november","december"];
+  const mon = months.indexOf(m[5].toLowerCase());
+  if(mon < 0) return null;
+  let hr = +m[1] % 12;
+  if(/pm/i.test(m[3]||"")) hr += 12;
+  return new Date(+m[6], mon, +m[4], hr, +m[2]).getTime();
 }
 
-function officialMaxKn(text){
-  if(!text) return null;
-  // Strip the parts that contain numbers which are not wind speeds: the
-  // "Issued 10:30 AM PDT 22 August 2026" trailer, clock times, and dates.
-  // Without this, "10:30" reads as a 30-knot wind.
-  const t = text
-    .replace(/\bissued\b[^.]*/gi, " ")
+function clauseMaxKn(clause){
+  // Strip the issue trailer, clock times and dates — "10:30" is not a wind.
+  const t = clause
+    .replace(/\bissued\b[^.]*/ig, " ")
     .replace(/\d{1,2}\s*:\s*\d{2}/g, " ")
-    .replace(/\b\d{1,2}\s+(january|february|march|april|may|june|july|august|september|october|november|december)\b/gi, " ")
+    .replace(/\b\d{1,2}\s+(january|february|march|april|may|june|july|august|september|october|november|december)\b/ig, " ")
     .replace(/\b(19|20)\d{2}\b/g, " ");
-  // Marine forecasts say "knots" once and imply it thereafter — "10 to 15
-  // knots ... except southwest 20 over southern sections" — so a lookahead for
-  // the word misses the highest figure. With times and dates already gone,
-  // every remaining number in a wind bulletin is a wind speed.
-  if(!/knot/i.test(t)) return null;
-  const hits = [...t.matchAll(/\b(\d{1,3})\b/g)]
-    .map(m => +m[1]).filter(n => n >= 5 && n <= 70);
+  // Wave heights are not winds.
+  if(/\b(metre|meter|foot|feet)\b/i.test(t)) return null;
+  const hits = [...t.matchAll(/\b(\d{1,3})\b/g)].map(x => +x[1]).filter(n => n >= 5 && n <= 70);
   return hits.length ? Math.max(...hits) : null;
+}
+
+function weekdayDate(name, issuedMs){
+  const idx = DAYNAMES.findIndex(d => d.toLowerCase() === name.toLowerCase());
+  const base = new Date(dayFloor(issuedMs));
+  let delta = (idx - base.getDay() + 7) % 7;
+  if(delta === 0) delta = 7;            // a named day is never the issue day
+  return addDays(issuedMs, delta);
+}
+
+/* Where in time does this clause sit, measured against the day its SENTENCE
+   is about? "late in the day" inside the Saturday line means Saturday
+   afternoon, not the afternoon the bulletin was written. Returns null when
+   the clause carries no time word of its own. */
+function clauseSpan(clause, ctxDayMs, issuedMs){
+  const wd = clause.match(WD_RX);
+  if(wd){
+    const day = weekdayDate(wd[1], issuedMs);
+    const sp = wd[2] ? WD_SPAN[wd[2].toLowerCase()] : [5, 22];
+    return [atHour(day, sp[0]), atHour(day, sp[1])];
+  }
+  for(const [re, a, b] of TIME_WORDS)
+    if(re.test(clause)) return [atHour(ctxDayMs, a), atHour(ctxDayMs, b)];
+  return null;
+}
+
+function splitClauses(sentence){
+  const parts = sentence.split(new RegExp("(" + CONNECTIVE.source + ")", "ig"));
+  const out = [];
+  let cur = parts[0] || "";
+  for(let i = 1; i < parts.length; i += 2){
+    out.push(cur);
+    cur = (parts[i] || "") + (parts[i+1] || "");
+  }
+  out.push(cur);
+  return out.map(x => x.trim()).filter(Boolean);
+}
+
+/* One sentence into dated periods.
+
+   The weekday is stripped before splitting into clauses — it labels the whole
+   sentence, not the first clause, and leaving it in would anchor "Sunday:
+   wind 25 to 35 easing to 10 to 20" so that the 35 covered all of Sunday and
+   the easing covered an hour at dawn.
+
+   Clauses with no time word of their own share the sentence's span in order,
+   which is what "X easing to Y" means when no hour is given. An "except"
+   clause is spatial, not temporal, so it inherits the span of the clause
+   before it rather than taking a slot in the sequence. */
+function parseSentence(sent, ctx, label, issuedMs){
+  const wd = sent.match(WD_RX);
+  let dayMs = ctx.day, span = ctx.span;
+  let body = sent;
+  if(wd){
+    dayMs = weekdayDate(wd[1], issuedMs);
+    span  = wd[2] ? WD_SPAN[wd[2].toLowerCase()] : [5, 22];
+    body  = sent.replace(WD_RX, " ");
+    ctx.day = dayMs; ctx.span = span;        // carries to following sentences
+  }
+
+  const parsed = splitClauses(body).map(cl => {
+    const kn = clauseMaxKn(cl);
+    if(kn == null) return null;
+    return { kn, text: cl.replace(/\s+/g," ").replace(/^[\s:,.;-]+/,"").replace(/\s+([.,;])/g,"$1").trim(),
+             span: clauseSpan(cl, dayMs, issuedMs),
+             isExcept: /^except\b/i.test(cl.trim()) };
+  }).filter(Boolean);
+  if(!parsed.length) return [];
+
+  const baseStart = atHour(dayMs, span[0]);
+  const baseEnd   = atHour(dayMs, span[1]);
+  const firstAnchored = parsed.find(p => p.span && !p.isExcept);
+  const limit = firstAnchored ? Math.min(firstAnchored.span[0], baseEnd) : baseEnd;
+
+  // Unanchored clauses that are not "except" share the run up to the first
+  // dated clause, in the order they are written.
+  const queue = parsed.filter(p => !p.span && !p.isExcept);
+  const total = Math.max(limit - baseStart, 36e5);
+
+  const out = [];
+  let lastSpan = null;
+  parsed.forEach(p => {
+    let st, en, approx = false;
+    if(p.isExcept && lastSpan){ [st, en] = lastSpan; }
+    else if(p.span){ [st, en] = p.span; }
+    else {
+      const k = queue.indexOf(p), n = queue.length;
+      st = baseStart + total * k / n;
+      en = baseStart + total * (k + 1) / n;
+      approx = n > 1;
+    }
+    lastSpan = [st, en];
+    if(en > st) out.push({ kn:p.kn, start:st, end:en, text:p.text, label,
+                           anchored: !!p.span, approx });
+  });
+  /* Nothing follows the last clause, so it holds until the period ends.
+     Otherwise "increasing to 30 to 40 late in the day" would stop at 9 pm and
+     the last hour of the day would silently fall back to model-only. */
+  if(out.length){
+    const last = out[out.length-1];
+    if(last.end < baseEnd) last.end = baseEnd;
+  }
+  return out;
+}
+
+/* One block of forecast prose into dated periods. The day context carries
+   forward between sentences, so a block headed "Saturday:" keeps meaning
+   Saturday until another day is named. */
+function parseBlock(text, issuedMs, baseSpan, label){
+  if(!text) return [];
+  const body = text.replace(/\bissued\b[^.]*/ig, " ");
+  const ctx = { day: dayFloor(issuedMs), span: baseSpan };
+  return body.split(/(?<=[.;])\s+/)
+             .flatMap(sent => sent.trim() ? parseSentence(sent, ctx, label, issuedMs) : []);
+}
+
+/* Both halves of one zone's bulletin, as a single list of dated periods. */
+function zonePeriods(zoneData, zoneName){
+  if(!zoneData) return [];
+  const issued = parseIssued(zoneData.forecast?.text || "")
+              || parseIssued(zoneData.extended?.text || "");
+  if(!issued) return [];
+  const title = zoneData.forecast?.title || "";
+  const baseSpan = /\btoday\b/i.test(title)
+      ? [Math.max(5, new Date(issued).getHours()), 18]
+      : /\btonight\b/i.test(title) ? [18, 30] : [5, 22];
+  return [
+    ...parseBlock(zoneData.forecast?.text, issued, baseSpan, zoneName),
+    ...parseBlock(zoneData.extended?.text, issued, [5, 22], zoneName)
+  ];
+}
+
+function officialPeriods(zones){
+  if(!BULLETIN || !BULLETIN.zones) return [];
+  return (zones || Object.keys(BULLETIN.zones))
+    .flatMap(z => zonePeriods(BULLETIN.zones[z], ZONES[z] ? ZONES[z].name : z));
+}
+
+const overlaps = (p, a, b) => p.start < b && p.end > a;
+
+/* The official wind for one hour: the worst clause covering it, across every
+   zone the route touches. Null means the bulletin says nothing about it. */
+function officialAtHour(periods, ms){
+  const hit = periods.filter(p => ms >= p.start && ms < p.end);
+  if(hit.length) return hit.reduce((best, p) => p.kn > best.kn ? p : best, hit[0]);
+  /* No clause covers this hour — usually an hour before the bulletin was
+     issued, or a seam between periods. Borrowing the nearest clause on the
+     same day is far better than silently dropping back to model-only, which
+     would leave one unscaled hour sitting next to scaled ones. */
+  const day = dayFloor(ms);
+  const near = periods
+    .filter(p => dayFloor(p.start) === day || dayFloor(p.end - 1) === day)
+    .map(p => ({ p, gap: ms < p.start ? p.start - ms : ms - p.end }))
+    .filter(x => x.gap <= 6*36e5)
+    .sort((a, b) => a.gap - b.gap || b.p.kn - a.p.kn);
+  return near.length ? { ...near[0].p, inferred:true } : null;
+}
+
+/* Everything the bulletin says about one trip window, and — just as
+   importantly — what it says about hours OUTSIDE that window, so a gale that
+   arrives after you are home can be named and set aside. */
+function officialWindow(zones, dayISO, depHH, retHH){
+  const periods = officialPeriods(zones);
+  if(!periods.length) return null;
+  const a = new Date(`${dayISO}T${depHH || "05:00"}:00`).getTime();
+  const b = new Date(`${dayISO}T${retHH || "21:00"}:00`).getTime();
+  const inWin  = periods.filter(p => overlaps(p, a, b));
+  /* "Outside the window" is only interesting if it is close enough to matter —
+     the evening you get home, or the night before. A gale three days away is
+     not a reason to colour today. */
+  const near0 = dayFloor(a) - 12*36e5, near1 = dayFloor(a) + 36*36e5;
+  const outWin = periods.filter(p => !overlaps(p, a, b) && overlaps(p, near0, near1));
+  const worst  = inWin.length ? inWin.reduce((m,p) => p.kn > m.kn ? p : m, inWin[0]) : null;
+  return {
+    periods, inWin, from:a, to:b,
+    maxKn: worst ? worst.kn : null,
+    worst,
+    strongOutside: outWin.filter(p => p.kn >= 20)
+                         .sort((x,y) => y.kn - x.kn || x.start - y.start),
+    anyStrongInside: inWin.some(p => p.kn >= 20)
+  };
+}
+
+/* Environment Canada's own wind categories. */
+function windClass(kn){
+  if(kn == null) return "";
+  if(kn < 12) return "light";
+  if(kn < 20) return "moderate";
+  if(kn < 34) return "strong";
+  if(kn < 48) return "gale force";
+  return "storm force";
+}
+
+function whenLabel(p){
+  const d = new Date(p.start), e = new Date(p.end);
+  const today = dayFloor(Date.now());
+  const dayOff = Math.round((dayFloor(p.start) - today) / 864e5);
+  const dayName = dayOff === 0 ? "today" : dayOff === 1 ? "tomorrow"
+                : DAYNAMES[d.getDay()];
+  const hr = x => { const h = x.getHours();
+    return h === 0 ? "midnight" : h === 12 ? "noon"
+      : (h % 12 || 12) + (h < 12 ? " am" : " pm"); };
+  return `${dayName} ${hr(d)}–${hr(e)}`;
 }
 
 /* Open-Meteo accepts comma-separated coordinates and returns one block per
@@ -1114,7 +1251,6 @@ const STATION_KEYS = {
   sidney:  [["sidney"],           48.65, -123.39],
   bedwell: [["bedwell"],          48.75, -123.23],
   fulford: [["fulford"],          48.77, -123.45],
-  patricia: [["patricia"],        48.65, -123.45],
   ganges:  [["ganges"],           48.85, -123.50]
 };
 const TIDE_FALLBACK = "sidney";
@@ -1157,11 +1293,8 @@ async function stationSeries(st, fromISO, toISO){
 /* Tide predictions for the day, straight from the Canadian Hydrographic
    Service. Currents and slack times are derived from these. */
 async function loadTides(dayISO){
-  /* Was -6h to +30h — a single day. The day's own strongest current was then
-     normalised to peakKn, so every day read as a spring tide. Eight days gives
-     currentSeries() a real spring-to-neap range to scale against. */
-  const from = new Date(dayISO+"T00:00:00"); from.setDate(from.getDate()-4);
-  const to   = new Date(dayISO+"T00:00:00"); to.setDate(to.getDate()+4);
+  const from = new Date(dayISO+"T00:00:00"); from.setHours(from.getHours()-6);
+  const to   = new Date(dayISO+"T00:00:00"); to.setHours(to.getHours()+30);
   const iso = d => d.toISOString().slice(0,19)+"Z";
   try{
     const list = await stationIndex();
@@ -1179,12 +1312,8 @@ async function loadTides(dayISO){
   }
 }
 
-async function loadWind(legsIn, dayISO, stationPts){
-  /* Station coordinates ride along so the model can be sampled exactly where
-     the station stands. Comparing a station reading against the forecast for
-     a leg 20 km away would show a disagreement that is only distance. */
-  const stns = stationPts || [];
-  const legs = [...legsIn, OPEN_REF, ...stns];
+async function loadWind(legsIn, dayISO){
+  const legs = [...legsIn, OPEN_REF];        // last block is the open-water reference
   const days = Math.round((new Date(dayISO+"T12:00") - new Date(new Date().toDateString()))/864e5);
   const model = days <= 2 ? "gem_hrdps_continental" : "best_match";
   const p = new URLSearchParams({
@@ -1203,8 +1332,7 @@ async function loadWind(legsIn, dayISO, stationPts){
      would quietly become a one-leg route with no warning at all. */
   if(j.length !== legs.length)
     throw new Error(`weather service returned ${j.length} locations for ${legs.length} requested`);
-  return { model, refIndex: legsIn.length, stationIndex: legsIn.length+1,
-           stationKeys: stns.map(x=>x.key), blocks: j.map(b => {
+  return { model, refIndex: legs.length-1, blocks: j.map(b => {
     const m = {};
     b.hourly.time.forEach((t,i)=>{ m[t.slice(11,16)] = {
       wind: b.hourly.wind_speed_10m[i], gust: b.hourly.wind_gusts_10m[i],
@@ -1225,26 +1353,17 @@ function currentSeries(stationKey, dayISO, peakKn, offsetMin){
   if(!raw) return null;
   const pts = raw.map(([t,v]) => [new Date(t).getTime(), v])
                  .sort((a,b)=>a[0]-b[0]);
-  if(pts.length < 3) return null;
-
-  /* Rate of change across EVERYTHING held — about eight days. peakKn describes
-     the strongest current this leg ever runs, so the divisor has to be the
-     strongest rate in that whole span, not just today's. Previously the day's
-     own maximum was mapped to peakKn every single day, which meant a weak neap
-     tide was reported at full spring strength. Slack TIMING was always right;
-     it was the rate that was inflated. */
-  const der = [];
-  for(let i=1;i<pts.length-1;i++){
-    const dtH = (pts[i+1][0]-pts[i-1][0])/36e5;
-    der.push([pts[i][0] + offsetMin*6e4, (pts[i+1][1]-pts[i-1][1])/dtH]);
-  }
-  const scale = Math.max(...der.map(d=>Math.abs(d[1]))) || 1;
-
   const d0 = new Date(dayISO+"T00:00:00").getTime() - 36e5;
   const d1 = d0 + 26*36e5;
-  const out = der.filter(d => d[0]>=d0 && d[0]<=d1)
-                 .map(([t,v]) => [t, v/scale*peakKn]);
-  if(out.length < 3) return null;
+  const win = pts.filter(p => p[0]>=d0 && p[0]<=d1);
+  if(win.length < 3) return null;
+  const der = [];
+  for(let i=1;i<win.length-1;i++){
+    const dtH = (win[i+1][0]-win[i-1][0])/36e5;
+    der.push([win[i][0] + offsetMin*6e4, (win[i+1][1]-win[i-1][1])/dtH]);
+  }
+  const scale = Math.max(...der.map(d=>Math.abs(d[1]))) || 1;
+  const out = der.map(([t,v]) => [t, v/scale*peakKn]);
   out.station = key;
   out.substituted = key !== stationKey;
   return out;
@@ -1280,19 +1399,14 @@ function slackTimes(series){
 
 function evaluate(routeKey, dayISO, windData, currents){
   const route = ROUTES[routeKey];
-  const OFF = officialForDay(dayISO, route.zones);  // worst zone this route touches
 
-  /* How much the model under-reads in OPEN water, measured at OPEN_REF against
-     the zone forecast. That single ratio is then applied to every leg, so the
-     model's own picture of shelter and of hour-to-hour timing is preserved —
-     a channel behind an island stays calmer than mid-strait, as it should. */
+  /* Environment Canada supplies the LEVEL and the TIMING, hour by hour, from
+     the clauses that actually cover each hour. The model supplies the SHELTER
+     pattern — how much calmer a channel behind an island is than open water,
+     measured at OPEN_REF. Neither alone is right: the model reads low, and the
+     zone forecast knows nothing about which side of which island you are on. */
+  const OFFP = officialPeriods(route.zones);
   const refBlock = windData.blocks[windData.refIndex] || windData.blocks[0];
-  let modelPeak = 0;
-  Object.values(refBlock || {}).forEach(w => {
-    if(w && w.wind > modelPeak) modelPeak = w.wind;
-  });
-  const offScale = (USE_BULLETIN && OFF && modelPeak > 0 && OFF.maxKn > modelPeak)
-    ? OFF.maxKn / modelPeak : null;
   const hours = [];
   for(let h=5; h<=21; h++){
     const hh = String(h).padStart(2,"0")+":00";
@@ -1332,9 +1446,20 @@ function evaluate(routeKey, dayISO, windData, currents){
          Environment Canada's wind for this day, at the model's direction, and
          take whichever is worse. This is what stops a 6 kn model reading
          showing "Go" when the forecast says 15. */
-      let hsOff = null, bandOff = null, offWind = null;
-      if(offScale){
-        offWind = w.wind * offScale;                 // model shape, official level
+      let hsOff = null, bandOff = null, offWind = null, offSrc = null;
+      // What the official forecast says for THIS hour, not for the whole day.
+      const hourOff = MANUAL_KN
+        ? { kn: MANUAL_KN, label: "the figure you entered", text: "", manual: true }
+        : officialAtHour(OFFP, ms);
+      if(hourOff){
+        const refW = refBlock && refBlock[hh] ? refBlock[hh].wind : null;
+        // Shelter ratio, clamped so a near-calm reference cannot blow up.
+        const shelter = (refW && refW > 0.5)
+          ? Math.max(0.15, Math.min(1.3, w.wind / refW)) : 1;
+        const cand = hourOff.kn * shelter;
+        if(cand > w.wind){ offWind = cand; offSrc = hourOff; }
+      }
+      if(offWind){
         const seaOff = fetchLimitedSea(offWind, fetchMetres(leg, w.from));
         hsOff = seaOff.hs;
         if(opposed){
@@ -1373,21 +1498,25 @@ function evaluate(routeKey, dayISO, windData, currents){
       }
       if(sea.buildHours > 3 && w.wind >= 12) reasons.push({t:`These seas need about ${sea.buildHours.toFixed(1)} h of steady wind to fully build — less if it just came up.`});
 
-      if(hsOff && hsOff > hs*1.25){
+      if(hsOff && hsOff > hs*1.25 && offSrc){
         reasons.push({bad: bandOff === "red", t:
-          `Environment Canada forecasts up to ${OFF.maxKn} kn for ${OFF.label} and the model here `
-          + `only ${Math.round(w.wind)} kn. Scaled to the official figure this hour is `
-          + `${Math.round(offWind)} kn and ${hsOff.toFixed(2)} m, not ${hs.toFixed(2)} m. `
-          + `The verdict uses the worse of the two.`});
+          offSrc.manual
+            ? `Using your ${offSrc.kn} kn against the model's ${Math.round(w.wind)} kn — `
+              + `${Math.round(offWind)} kn on this leg, ${hsOff.toFixed(2)} m not ${hs.toFixed(2)} m.`
+            : `${esc(offSrc.label)} forecasts ${offSrc.kn} kn for this hour `
+              + `(${esc(offSrc.text || "")}${offSrc.inferred ? ", the nearest clause — this hour is outside the bulletin's own periods" : ""}) `
+              + `against the model's ${Math.round(w.wind)} kn. `
+              + `Allowing for shelter that is ${Math.round(offWind)} kn here and `
+              + `${hsOff.toFixed(2)} m, not ${hs.toFixed(2)} m. The verdict uses the worse.`});
       }
       legs.push({name:leg.name, note:leg.note, wind:w.wind, gust:w.gust, from:w.from,
                  hs, tp, steep, blocked, cur, opposed, band, reasons,
-                 temp:w.temp, code:w.code, precip:w.precip, vis:w.vis, cape:w.cape,
-                 hsOff, bandOff, offWind, offKn: OFF ? OFF.maxKn : null});
+                 hsOff, bandOff, offWind, offKn: offSrc ? offSrc.kn : null,
+                 offLabel: offSrc ? offSrc.label : null});
     });
     if(legs.length) hours.push({hh, ms, legs, band: legs.map(l=>l.band).reduce(worseOf,"green")});
   }
-  return {route, hours, day: dayISO, offScale, offKn: OFF ? OFF.maxKn : null};
+  return {route, hours, day: dayISO};
 }
 
 /* The figures the verdict actually used. When the official forecast is higher
@@ -1533,136 +1662,6 @@ function renderRibbon(ev, sel){
       : ""}</div>`;
 }
 
-/* Observed wind against forecast wind, for today only.
-
-   Deliberately compact: one row of hours, and one sentence saying whether the
-   model has been running high or low. Both are read AT THE STATION, so this
-   answers "is today's forecast trustworthy" rather than pretending a reading
-   from twenty kilometres away is the water you'll cross. */
-/* Observed wind against forecast wind, for today only.
-
-   Mirrors the strip above hour for hour: the same leg the forecast strip
-   called worst that hour, and that leg's own station. A fixed leg was wrong —
-   the strip switches between legs through the day, so the two rows were
-   describing different water at the same hour. */
-function renderActual(ev, windData, route){
-  const today = new Date(); today.setHours(0,0,0,0);
-  if(Math.round((new Date((ev.day||"")+"T00:00:00") - today)/864e5) !== 0) return "";
-
-  if(!REPO_BULLETIN)
-    return `<div class="note warn">No measured wind available &mdash;
-      <code>data/bulletin.json</code> didn't load, so there is nothing to compare against.</div>`;
-  if(!REPO_BULLETIN.observations)
-    return `<div class="note warn">No measured wind in <code>data/bulletin.json</code> yet.
-      Run the <em>Refresh marine bulletin</em> job once and readings will appear here.</div>`;
-
-  const obsData = REPO_BULLETIN.observations;
-  const usedStations = [], rows = [];
-
-  ev.hours.forEach(h => {
-    // the leg this hour's forecast cell was built from
-    let wi = 0;
-    h.legs.forEach((l,i) => { if(eff(l).hs > eff(h.legs[wi]).hs) wi = i; });
-    const leg = route.legs[wi];
-    if(!leg) return;
-    const key = (leg.obs || [])[0];
-    const stn = key && obsData[key];
-    if(!stn || !stn.readings) return;
-
-    let best = null, gap = 45*60000;
-    stn.readings.forEach(r => {
-      const g = Math.abs(new Date(r.t).getTime() - h.ms);
-      if(g < gap){ gap = g; best = r; }
-    });
-    if(!best) return;
-    if(!usedStations.includes(stn.name)) usedStations.push(stn.name);
-
-    const dir = best.dir != null ? best.dir : 180;
-    const sea = fetchLimitedSea(best.kn, fetchMetres(leg, dir));
-    let hs = sea.hs, tp = sea.tp, blocked = false;
-
-    const cur = interp((CURRENTS||[])[wi], h.ms);
-    const setDeg = cur >= 0 ? leg.floodSet : (leg.floodSet+180)%360;
-    if((CURRENTS||[])[wi] && angGap((dir+180)%360, setDeg) >= WAC.oppositionDeg
-       && Math.abs(cur) >= WAC.minCurrentKn){
-      const r = currentSteepening(hs, tp, Math.abs(cur));
-      hs = r.hs; blocked = r.blocked;
-    }
-    let band = bandFor(hs, best.gust != null ? best.gust : best.kn);
-    if(hs >= WAC.minDangerousHs && blocked) band = "red";
-
-    // forecast wind at that same station, so the difference is model error
-    const si = (windData.stationKeys||[]).indexOf(key);
-    const fB = si >= 0 ? windData.blocks[windData.stationIndex + si] : null;
-    const fc = fB ? fB[h.hh] : null;
-
-    rows.push({hh:h.hh, wi, obs:best, hs, band, blocked, station:stn.name,
-               fcHs: eff(h.legs[wi]).hs,
-               fc: fc ? fc.wind : null,
-               fcScaled: fc && ev.offScale ? fc.wind*ev.offScale : null});
-  });
-
-  if(rows.length < 2)
-    return `<div class="note">Not enough measured wind for today yet. The hourly job fills this in
-      as the day goes on.</div>`;
-
-  const multi = route.legs.length > 1;
-  const cells = rows.map(r => {
-    const fcUse = USE_BULLETIN && r.fcScaled != null ? r.fcScaled : r.fc;
-    const d = fcUse != null ? r.obs.kn - fcUse : null;
-    const col = d == null ? "var(--faint)"
-      : (d >= 3 ? "var(--stop)" : (d <= -3 ? "var(--mark)" : "var(--go)"));
-    return `<div class="cell ${r.band}">
-      <div class="hr">${r.hh.slice(0,2)}</div><div class="bar"></div>
-      <div>${r.hs.toFixed(2)}</div>
-      <div class="wd">${r.obs.dir != null ? sectorFor(r.obs.dir) : ""}${r.obs.kn.toFixed(0)}</div>
-      <div class="wd" style="color:${col}">${d == null ? "—" : (d>0?"+":"")+d.toFixed(0)}</div>
-      ${multi ? `<div class="lg">leg ${r.wi+1}</div>` : ""}</div>`;
-  }).join("");
-
-  const paired = rows.filter(r => r.fc != null);
-  const errModel = paired.length
-    ? paired.reduce((a,r)=>a+Math.abs(r.obs.kn-r.fc),0)/paired.length : null;
-  const errScaled = (paired.length && ev.offScale)
-    ? paired.reduce((a,r)=>a+Math.abs(r.obs.kn-r.fcScaled),0)/paired.length : null;
-
-  let scoreLine = "";
-  if(errModel != null && errScaled != null){
-    const won = errScaled < errModel;
-    scoreLine = `<div class="note ${won?"":"warn"}">
-      <strong>${won ? "The bulletin was closer today." : "The raw model was closer today."}</strong>
-      Against the wind actually measured, Environment Canada's ${ev.offKn} kn was out by an average
-      of ${errScaled.toFixed(1)} kn and the model by ${errModel.toFixed(1)} kn.
-      ${won ? "Leaving the switch on <em>Forecast applied</em> is right for this day."
-            : "The bulletin has overshot today &mdash; but it is built to be cautious, and "
-              + "overshooting is the safe direction to be wrong in."}</div>`;
-  }
-
-  const last = rows[rows.length-1];
-  const lastMs = new Date(last.obs.t).getTime();
-  const behindMin = Math.round((Date.now() - lastMs)/60000);
-  const lagNote = behindMin > 100
-    ? `<br><br><span style="color:var(--marg)">The newest reading is
-       ${(behindMin/60).toFixed(1)} hours old. The hourly job may be running late &mdash;
-       scheduled jobs on GitHub are best-effort and can be delayed.</span>` : "";
-
-  return `<h2>What actually happened</h2>
-    <div class="ribbon"><div class="ribbon-inner"><div class="cells">${cells}</div></div></div>
-    <div class="legend">
-      <span>Seas (m) worked out from the wind measured, over the same leg the strip above used
-        that hour &mdash; same arithmetic, so the two rows read against each other.</span>
-      <span style="color:var(--stop)">+ windier than forecast</span>
-      <span style="color:var(--mark)">&minus; lighter</span>
-    </div>
-    ${scoreLine}
-    <div class="note">Worst measured hour so far:
-      <strong>${Math.max(...rows.map(r=>r.hs)).toFixed(2)} m</strong>, against
-      ${Math.max(...rows.map(r=>r.fcHs)).toFixed(2)} m forecast for the same hours.
-      Readings from ${esc(usedStations.join(", "))}.
-      <br><br>The wind is measured at those stations, not on your legs, so treat this as a check on
-      how well the forecast is holding up today rather than a report from your route.${lagNote}</div>`;
-}
-
 function renderLegs(hour){
   if(!hour) return "";
   const rows = hour.legs.map(l => {
@@ -1772,7 +1771,7 @@ function renderCheat(route, ev){
     const l = h.legs[legIdx];
     const set = l.cur >= 0 ? route.legs[legIdx].floodSet : (route.legs[legIdx].floodSet+180)%360;
     const e = eff(l);
-    return { hh:h.hh, from:l.from, wind:e.wind, modelWind:l.wind,
+    return { hh:h.hh, from:l.wind_from ?? l.from, wind:e.wind, modelWind:l.wind,
              scaled:e.scaled, cur:l.cur, set, opposed:l.opposed,
              blocked:l.blocked, band:h.band };
   });
@@ -1892,7 +1891,7 @@ function renderBulletin(ev){
     `<a href="${zonePage(z)}" target="_blank" rel="noopener">${esc(ZONES[z].name)} &#8599;</a>`).join(" &nbsp;·&nbsp; ");
 
   if(MANUAL_KN){
-    const warns = BULLETIN && BULLETIN.zones && withinWarnHorizon(ev.day || "")
+    const warns = BULLETIN && BULLETIN.zones
       ? zones.flatMap(z => (BULLETIN.zones[z]?.warnings||[]).map(w => `${ZONES[z].name}: ${w.title.replace(/, .*$/,"")}`))
       : [];
     return `<div class="bulletin warn">
@@ -1934,42 +1933,18 @@ function renderBulletin(ev){
   const anyStale = zones.some(z => BULLETIN.zones[z]?.stale);
   const veryStale = zones.some(z => BULLETIN.zones[z]?.veryStale);
 
-  /* The stored copy can be minutes old and still hold an out-of-date bulletin
-     if the server it came from is lagging. Say so plainly. */
-  const issuedOld = zones.map(z => BULLETIN.zones[z])
-    .filter(zd => zd && zd.issuedStale)
-    .map(zd => Math.round(zd.issuedAgeMin/60));
-  if(issuedOld.length){
-    out += `<div class="bulletin err">
-      <span class="lbl">The forecast itself is out of date</span>
-      <div class="w">The copy on this page was refreshed recently, but the bulletin inside it was
-        published by Environment Canada <strong>${Math.max(...issuedOld)} hours ago</strong>.
-        They issue every six hours, so at least one scheduled issue has been missed &mdash;
-        either at their end or on the server this was fetched from.</div>
-      <div class="w"><strong>Do not trust the verdicts below.</strong> Read the official forecast
-        using a link on this page and type the wind into <em>Forecast wind</em>.</div></div>`;
-  }
-
   if(anyStale){
     const age = oldest < 90 ? oldest+" minutes" : (oldest/60).toFixed(1)+" hours";
     out += `<div class="bulletin ${veryStale?"err":"warn"}">
       <span class="lbl">This bulletin is ${age} old</span>
       <div class="w">A fresh copy was requested and did not arrive, so the stored one is being used.
         Environment Canada reissues about four times a day plus amendments, so a warning may have been
-        added or lifted since. <a href="#" id="refreshbul">Try again now</a></div>
-      ${FETCH_ERR ? `<div class="w" style="color:var(--faint);font-size:13px">
-        Why the refresh failed: ${esc(FETCH_ERR)}</div>` : ""}</div>`;
+        added or lifted since. <a href="#" id="refreshbul">Try again now</a></div></div>`;
   }
 
   // Warnings, per zone
   const warned = zones.filter(z => BULLETIN.zones[z]?.warnings?.length);
-  const farOut = !withinWarnHorizon(ev.day || "");
-
-  /* Beyond 48 hours the warnings are not read, not listed, and not applied.
-     Repeating today's warning here would only invite it to be read as applying
-     to a day it says nothing about. A single plain message covers it instead —
-     see the farOut block further down. */
-  if(warned.length && !farOut){
+  if(warned.length){
     out += `<div class="bulletin warn">
       <span class="lbl">Warning in effect</span>
       ${warned.map(z => `
@@ -1993,37 +1968,68 @@ function renderBulletin(ev){
     }).join("")}
     <div class="w">${links}${BULLETIN.zones[zones[0]]?.src?` &nbsp;·&nbsp; <span style="color:var(--faint)">${esc(BULLETIN.zones[zones[0]].src)}</span>`:""}</div></div>`;
 
-  // How the figure is being applied
-  const off = officialForDay(ev.day || "", zones);
-  const modelMax = Math.max(...ev.hours.flatMap(hr=>hr.legs.map(l=>l.wind)), 0);
-  if(off && modelMax && off.maxKn > modelMax){
-    out += `<div class="bulletin warn">
-      <span class="lbl">Forecast applied to the numbers below</span>
-      <div class="w">Worst applicable zone is <strong>${esc(off.label)}</strong> at
-        <strong>${off.maxKn} kn</strong>${off.text?` &mdash; &ldquo;${esc(off.text)}&rdquo;`:""}, against a
-        model peak of <strong>${Math.round(modelMax)} kn</strong> in open water. Wave figures are
-        scaled up to the official level, keeping the model's hour-to-hour shape and its picture of
-        which legs are sheltered. Every verdict uses the worse of the two.</div>
-      <div class="w" style="color:var(--faint);font-size:13px">This happened automatically &mdash;
-        nothing to type. Use the <em>Forecast wind</em> box only if you want to override it.
-        <br><br>This still trusts the model's
-        <em>timing</em>. If the ${off.maxKn} kn arrives at a different hour than the model expects,
-        the shape is wrong — treat that figure as possible at any hour.</div></div>`;
+  // How the forecast is being applied, hour by hour
+  const win = ev.window || {};
+  const ow = MANUAL_KN ? null : officialWindow(zones, ev.day || "", win.depHH, win.retHH);
+  const modelMax = Math.max(...ev.hours.flatMap(hr => hr.legs.map(l => l.wind)), 0);
+  const label = win.depHH ? `${pretty(win.depHH)}–${pretty(win.retHH)}` : "05:00–21:00";
+
+  if(ow && ow.maxKn != null){
+    const rows = ow.inWin
+      .slice().sort((x,y) => x.start - y.start)
+      .map(pd => `<tr><td>${esc(whenLabel(pd))}</td><td class="kn">${pd.kn} kn</td>
+        <td>${esc(windClass(pd.kn))}</td><td class="src">${esc(pd.text)}</td></tr>`).join("");
+
+    out += `<div class="bulletin ${ow.anyStrongInside ? "warn" : ""}">
+      <span class="lbl">Forecast for your window &mdash; ${esc(label)}</span>
+      <div class="w">Worst inside your hours is <strong>${ow.maxKn} kn</strong>
+        (${esc(windClass(ow.maxKn))})${ow.worst && ow.worst.label ? `, from ${esc(ow.worst.label)}` : ""}.
+        ${modelMax ? `The model peaks at ${Math.round(modelMax)} kn.` : ""}
+        Each hour below uses the clause covering that hour, scaled for how sheltered the leg is.</div>
+      <table class="periods"><thead><tr><th>When</th><th>Wind</th><th></th><th>Forecast says</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`;
   }
 
-  if(farOut){
-    out += `<div class="bulletin warn">
-      <span class="lbl">Beyond 48 hours — warnings not accounted for</span>
-      <div class="w">Nothing shown for this date accounts for wind warnings. A warning describes
-        the next day or two only, so any in effect right now are deliberately <strong>not</strong>
-        being read or applied here.</div>
-      <div class="w">${off
-        ? `The forecast text above is still being used for the wind figure, but treat it as a
-           rough steer rather than a verdict.`
-        : `No official wind figure is being applied either, so the figures below are
-           <strong>model only</strong>, with nothing checking them.`}
-        Good for spotting a promising day; not something to commit to. Re-run it inside two days,
-        when the warning picture is real.</div></div>`;
+  /* The point of the whole timeline: a warning banner covers the zone for the
+     whole bulletin, and the strong winds in it are often on a different day
+     or a different part of the day than the trip being planned. */
+  if(ow && ow.strongOutside.length && !ow.anyStrongInside){
+    const list = ow.strongOutside.slice(0,3).map(pd =>
+      `<li><strong>${pd.kn} kn</strong> ${esc(whenLabel(pd))} &mdash; ${esc(pd.text)}</li>`).join("");
+    out += `<div class="bulletin">
+      <span class="lbl">Strong wind in the bulletin, but not in your window</span>
+      <div class="w">${warned.length ? "That warning above is real" : "The bulletin carries strong wind"},
+        and it falls <strong>outside ${esc(label)}</strong>:</div>
+      <ul class="outside">${list}</ul>
+      <div class="w">Nothing of 20 kn or more is forecast inside your hours, so none of it has been
+        applied to the numbers below. It is still worth knowing &mdash; weather runs early as often as
+        it runs late, and a system arriving at the end of your window is a reason to be home before it.</div></div>`;
+  }
+
+  /* Worse weather arriving just after the planned return is a reason to be
+     early, not a reason to colour the trip. Say it plainly. */
+  if(ow && ow.maxKn != null){
+    const soon = ow.strongOutside
+      .filter(pd => pd.start >= ow.to && pd.start - ow.to <= 4*36e5 && pd.kn > ow.maxKn)
+      .sort((x,y) => x.start - y.start)[0];
+    if(soon){
+      const gapH = Math.round((soon.start - ow.to)/36e5);
+      out += `<div class="bulletin warn">
+        <span class="lbl">It gets worse right after you plan to be back</span>
+        <div class="w"><strong>${soon.kn} kn</strong> (${esc(windClass(soon.kn))}) is forecast from
+          ${esc(whenLabel(soon))} &mdash; ${gapH === 0 ? "as your window ends" : `about ${gapH} h after you plan to be home`}.
+          Your window itself is forecast ${ow.maxKn} kn and the numbers below reflect that.
+          <br><br>Weather runs early as often as it runs late. Treat your return time as firm,
+          and bring it forward if the sky disagrees with the forecast.</div></div>`;
+    }
+  }
+
+  if(ow && ow.maxKn == null){
+    out += `<div class="bulletin err">
+      <span class="lbl">Bulletin does not reach your day</span>
+      <div class="w">The forecast carries nothing for ${esc(label)} on that date &mdash; it is probably
+        beyond the five days Environment Canada publishes. The figures below are model output only.
+        Type a wind into <em>Forecast wind</em> if you want them checked against something.</div></div>`;
   }
   return out;
 }
@@ -2180,84 +2186,6 @@ function initStationMap(route, ev, focusHH){
   setTimeout(()=>{ MAP.invalidateSize(); MAP.fitBounds(L.latLngBounds(pts).pad(0.06), {maxZoom:12}); }, 60);
 }
 
-/* WMO weather codes in plain English. Open-Meteo returns one for every leg and
-   hour; the engine was only using them to catch thunderstorms. */
-const WMO = {
-  0:"Clear", 1:"Mostly clear", 2:"Partly cloudy", 3:"Overcast",
-  45:"Fog", 48:"Freezing fog",
-  51:"Light drizzle", 53:"Drizzle", 55:"Heavy drizzle",
-  56:"Freezing drizzle", 57:"Freezing drizzle",
-  61:"Light rain", 63:"Rain", 65:"Heavy rain",
-  66:"Freezing rain", 67:"Freezing rain",
-  71:"Light snow", 73:"Snow", 75:"Heavy snow", 77:"Snow grains",
-  80:"Light showers", 81:"Showers", 82:"Heavy showers",
-  85:"Snow showers", 86:"Snow showers",
-  95:"Thunderstorm", 96:"Thunderstorm with hail", 99:"Thunderstorm with hail"
-};
-const wmoText = c => (c == null ? "—" : (WMO[c] || "Unsettled"));
-
-function renderWeather(ev, win){
-  const span = win
-    ? ev.hours.filter(h => h.hh >= win.depHH && h.hh <= win.retHH)
-    : ev.hours;
-  if(!span.length) return "";
-
-  const temps = [], viss = [], codeCount = {};
-  let precipTotal = 0;
-  span.forEach(h => h.legs.forEach(l => {
-    if(l.temp   != null) temps.push(l.temp);
-    if(l.vis    != null) viss.push(l.vis);
-    if(l.precip != null) precipTotal += l.precip;
-    if(l.code   != null) codeCount[l.code] = (codeCount[l.code]||0) + 1;
-  }));
-  if(!temps.length) return "";
-
-  const legCount = Math.max(1, ev.route.legs.length);
-  const avg = Math.round(temps.reduce((a,b)=>a+b,0)/temps.length);
-  const lo  = Math.round(Math.min(...temps));
-  const hi  = Math.round(Math.max(...temps));
-  const commonest = Object.entries(codeCount).sort((a,b)=>b[1]-a[1])[0];
-  const mainly = commonest ? wmoText(+commonest[0]) : "—";
-  const rain = precipTotal / legCount;           // per-leg total across the window
-  const minVis = viss.length ? Math.min(...viss) : null;
-  const showVis = v => v == null ? "—" : (v >= 10000 ? "10+ km" : (v/1000).toFixed(1)+" km");
-
-  const rows = span.filter((h,i) => i % 2 === 0).map(h => {
-    const l = h.legs[0];
-    return `<tr><td>${h.hh}</td>
-      <td>${l.temp != null ? Math.round(l.temp)+"&deg;" : "—"}</td>
-      <td style="font-family:var(--sans)">${esc(wmoText(l.code))}</td>
-      <td>${showVis(l.vis)}</td></tr>`;
-  }).join("");
-
-  const fogNote = (minVis != null && minVis < 5000)
-    ? `<div class="note ${minVis < 2000 ? "err" : "warn"}">Visibility drops to
-        <strong>${(minVis/1000).toFixed(1)} km</strong> in this window. You have no radar, and fog
-        is what most often catches an open boat out here.</div>`
-    : "";
-
-  const rainNote = rain >= 0.5
-    ? `<div class="note">About <strong>${rain.toFixed(1)} mm</strong> of rain across the window.
-        Wet, and it cuts your visibility further.</div>`
-    : "";
-
-  return `<h2>Weather ${win ? "while you're out" : "across the day"}</h2>
-    <div class="cheat"><div class="bands">
-      <div class="band"><div class="n">${avg}&deg;C</div>
-        <div class="w">Average air temp &mdash; ${lo}&deg; to ${hi}&deg;</div></div>
-      <div class="band"><div class="n" style="font:400 17px/1.2 var(--cond);letter-spacing:.03em">${esc(mainly)}</div>
-        <div class="w">Mostly</div></div>
-      <div class="band"><div class="n">${rain < 0.1 ? "Dry" : rain.toFixed(1)+" mm"}</div>
-        <div class="w">Rain</div></div>
-    </div></div>
-    <div class="scroll"><table>
-      <tr><th>Hr</th><th>Temp</th><th>Sky</th><th>Visibility</th></tr>${rows}</table></div>
-    ${fogNote}${rainNote}
-    <div class="note" style="color:var(--faint)">Air temperature, not water. The water here stays
-      around 10&ndash;12&deg;C all summer &mdash; dress for going in, not for sitting on the
-      deck.</div>`;
-}
-
 function renderLinks(route){
   /* Grouped by leg, so you know which station covers which patch of water,
      then the whole-trip forecasts and tide pages underneath. */
@@ -2298,6 +2226,7 @@ function render(ev, win, model){
 
   let h = "";
 
+  ev.window = win || {};
   h += renderBulletin(ev);
 
   if(TIDE_ERR) h += `<div class="note warn"><strong>Tides unavailable</strong> — ${esc(TIDE_ERR)}.
@@ -2307,18 +2236,11 @@ function render(ev, win, model){
     or see <em>If tides won't load</em> at the bottom of this page for a permanent fix.</div>`;
 
   if(win){
-    /* Unverified means nothing official is checking the model — either the
-       bulletin didn't load at all, or the day is past the range it covers. */
-    const unverified = !MANUAL_KN &&
-      (!BULLETIN || !officialForDay(ev.day || "", route.zones));
+    const unverified = !MANUAL_KN && !BULLETIN;
     h += `<h2>Your plan</h2>
       <div class="verdict ${win.verdict}${unverified?" unver":""}">
         <div class="word">${WORD[win.verdict]}${unverified?`<span class="unvtag">unverified</span>`:""}</div>
         <div class="detail">${pretty(win.depHH)} out, ${pretty(win.retHH)} back<br>
-          ${(win.askedDep && (win.askedDep.slice(3) !== "00" || win.askedRet.slice(3) !== "00"))
-            ? `<span style="color:var(--faint)">You asked for ${esc(win.askedDep)}&ndash;${esc(win.askedRet)}.
-               The forecast is hourly, so this is graded ${win.depHH}&ndash;${win.retHH} &mdash;
-               out early, back late, the longer day.</span><br>` : ""}
           ${win.tOut} min out · ${win.tBack} min back · about ${win.fuel} L (${win.fuelPct}% of tank)
           ${win.turnsBadAt?`<br><span class="b-red">Conditions turn bad at ${pretty(win.turnsBadAt)}, while you are out there.</span>`:""}
         </div></div>`;
@@ -2350,29 +2272,7 @@ function render(ev, win, model){
     }
   }
 
-  /* Sits directly above the strip, because comparing the two states of this
-     one graphic is the whole point of the switch. */
-  const off = officialForDay(ev.day || "", route.zones);
-  h += `<h2>Hour by hour</h2>`;
-  if(off){
-    h += `<div class="maptabs" style="margin-bottom:12px">
-      <button type="button" class="mtab${USE_BULLETIN?" on":""}" id="bulon">Forecast applied</button>
-      <button type="button" class="mtab${USE_BULLETIN?"":" on"}" id="buloff">Model only</button>
-    </div>`;
-    h += USE_BULLETIN
-      ? `<div class="note" style="margin-top:0">Wave heights are raised to Environment Canada's
-          <strong>${off.maxKn} kn</strong> where the model reads lower. Marked <span
-          style="color:var(--marg)">*</span> in the strip. Switch to <em>Model only</em> to see
-          what this day looks like without the bulletin.</div>`
-      : `<div class="note err" style="margin-top:0"><strong>Bulletin switched off.</strong>
-          These are raw model figures, and the model reads low here more often than not — the
-          official forecast for this day is <strong>${off.maxKn} kn</strong>. This view is for
-          comparison only. <strong>Do not plan from it.</strong> It switches itself back on the
-          next time you press Check.</div>`;
-  }
-  h += renderRibbon(ev, win ? [win.depHH, win.retHH] : null);
-
-  h += renderActual(ev, WIND_DATA, route);
+  h += `<h2>Hour by hour</h2>` + renderRibbon(ev, win ? [win.depHH, win.retHH] : null);
 
   const best = bestWindows(ev);
   const dayLabel = (() => {
@@ -2420,8 +2320,6 @@ function render(ev, win, model){
     h += `<h2>Legs at ${pretty(focusHH)}</h2>` + renderLegs(focus);
   }
 
-  h += renderWeather(ev, win);
-
   const first = route.legs[0];
   const _d = new Date(ev.hours[0].ms);
   const dayISO = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,"0")}-${String(_d.getDate()).padStart(2,"0")}`;
@@ -2456,22 +2354,12 @@ function render(ev, win, model){
     initStationMap(route, ev, btn.dataset.hh);
   });
 
-  const bOn = document.getElementById("bulon"), bOff = document.getElementById("buloff");
-  if(bOn)  bOn.onclick  = () => { if(!USE_BULLETIN){ USE_BULLETIN = true;  REDRAW && REDRAW(); } };
-  if(bOff) bOff.onclick = () => { if(USE_BULLETIN){  USE_BULLETIN = false; REDRAW && REDRAW(); } };
-
   const rb = document.getElementById("refreshbul");
   if(rb) rb.onclick = (e) => {
     e.preventDefault();
     rb.textContent = "fetching…";
-    /* Force a re-fetch WITHOUT deleting what's stored. An earlier version of
-       this deleted the cached bulletins first — which threw away the fallback
-       at the exact moment it was needed, since the usual reason for pressing
-       this is that the relays are failing. fetchZone() overwrites the cache on
-       success and loadBulletins() falls back to it on failure, so forcing the
-       attempt is all that's required. */
-    FORCE_BULLETIN = true;
-    BULLETIN_ERR = null;
+    try{ localStorage.removeItem("ec_bulletin"); }catch(err){}
+    BULLETIN = null; BULLETIN_ERR = null;
     run();
   };
 
@@ -2494,17 +2382,6 @@ const $ = id => document.getElementById(id);
 function initRoutes(){
   $("route").innerHTML = Object.entries(ROUTES)
     .map(([k,r])=>`<option value="${k}">${esc(r.label)}</option>`).join("");
-
-  /* Times are dropdowns, not free entry. The forecast is hourly, so only :00
-     and :30 mean anything — offering 5:17 would just be a lie about the
-     resolution. Blank is still allowed: leave both and you get best windows. */
-  const slots = ['<option value="">&mdash;</option>'];
-  for(let h=5; h<=21; h++) for(const m of ["00","30"])
-    slots.push(`<option value="${String(h).padStart(2,"0")}:${m}">`
-      + `${((h+11)%12)+1}:${m} ${h<12?"am":"pm"}</option>`);
-  $("depart").innerHTML = slots.join("");
-  $("ret").innerHTML = slots.join("");
-
   const now = new Date();
   $("day").value = new Date(now.getTime()-now.getTimezoneOffset()*6e4).toISOString().slice(0,10);
 }
@@ -2514,10 +2391,6 @@ async function run(e){
   const routeKey = $("route").value, dayISO = $("day").value;
   if(!dayISO) return;
   $("run").disabled = true;
-  /* Always back on for a fresh check. The switch is a comparison tool, not a
-     setting, and an optimistic view left on by accident is exactly the kind of
-     thing that gets someone into trouble. */
-  USE_BULLETIN = true;
   $("out").innerHTML = `<p class="loading">Fetching forecast and tides…</p>`;
 
   try{
@@ -2525,27 +2398,14 @@ async function run(e){
     const mk = parseFloat($("offwind").value);
     MANUAL_KN = (isFinite(mk) && mk > 0 && mk <= 70) ? mk : null;
 
-    /* Stations this route's legs actually name, in leg order. Used both to
-       sample the model at each station and to pick which one to compare. */
-    const stnKeys = [];
-    route.legs.forEach(l => (l.obs||[]).forEach(k => {
-      if(!stnKeys.includes(k) && OBS_STATIONS[k]) stnKeys.push(k);
-    }));
-    const stationPts = stnKeys.map(k => ({key:k, lat:OBS_STATIONS[k].lat, lon:OBS_STATIONS[k].lon}));
-
-    /* Load the repo file every time, not only when the bulletin needs
-       refreshing. It also carries the station observations, and those were
-       invisible whenever the cached bulletin was still fresh — which is most
-       of the time. Same origin, so it costs nothing. */
-    const [wind] = await Promise.all([
-      loadWind(route.legs, dayISO, stationPts), loadTides(dayISO), repoBulletin() ]);
+    // Wind and tides are fast and reliable — wait for these.
+    const [wind] = await Promise.all([ loadWind(route.legs, dayISO), loadTides(dayISO) ]);
     const currents = route.legs.map(l => currentSeries(l.cur, dayISO, l.peakKn, l.offsetMin));
 
     /* The Environment Canada bulletin comes through free public relays and is
        slow and unreliable. Waiting on it made the page feel broken, and cutting
        it short made it fail four times in five. So: draw immediately with what
        we have, then redraw if and when the bulletin arrives. */
-    WIND_DATA = wind; CURRENTS = currents;
     const draw = () => {
       const ev = evaluate(routeKey, dayISO, wind, currents);
       if(!ev.hours.length){
@@ -2556,22 +2416,12 @@ async function run(e){
       const dep = $("depart").value, ret = $("ret").value;
       let win = null;
       if(dep && ret && ret > dep){
-        /* The forecast is hourly, so a half-hour has to land on one. Round the
-           departure DOWN and the return UP — both toward the longer, more
-           exposed day. 5:30 back is graded against 6 pm, not 5. Was: norm()
-           truncated both, which quietly graded the wrong half of the return. */
-        const clamp = h => String(Math.max(5, Math.min(21, h))).padStart(2,"0")+":00";
-        const floorH = t => clamp(+t.slice(0,2));
-        const ceilH  = t => clamp(+t.slice(0,2) + (+t.slice(3,5) > 0 ? 1 : 0));
-        win = evaluateWindow(ev, floorH(dep), ceilH(ret));
-        if(win){ win.askedDep = dep; win.askedRet = ret; }
+        const norm = t => t.slice(0,2)+":00";
+        win = evaluateWindow(ev, norm(dep), norm(ret));
       }
       render(ev, win, wind.model);
       return true;
     };
-    /* The switch redraws from data already fetched — no network round trip,
-       so flipping between the two views is instant. */
-    REDRAW = draw;
 
     const zones = route.zones || ["haro"];
     const cached = cachedBulletins(zones);
@@ -2580,9 +2430,8 @@ async function run(e){
     if(!draw()) return;
 
     // Refresh in the background if anything is missing or past its 15 minutes.
-    const needsRefresh = FORCE_BULLETIN || !cached ||
+    const needsRefresh = !cached ||
       zones.some(z => !cached.zones[z] || cached.zones[z].stale);
-    FORCE_BULLETIN = false;
     if(needsRefresh){
       const token = ++RUN_TOKEN;
       loadBulletins(zones).then(() => {
