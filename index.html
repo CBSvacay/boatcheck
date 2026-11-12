@@ -210,6 +210,15 @@ table.periods td.bad{color:var(--stop);font-family:var(--mono)}
   font:400 12px var(--mono)}
 .leafmap{height:560px;background:var(--panel);border:1px solid var(--rule);border-radius:3px}
 @media (max-width:600px){ .leafmap{height:420px} }
+/* OpenStreetMap tiles are light; this darkens them to sit in a dark page.
+   Invert flips the brightness, hue-rotate puts the blues back where they were. */
+.leafmap.darkmap .leaflet-tile-pane{
+  filter:invert(1) hue-rotate(180deg) brightness(.93) contrast(.92) saturate(.65)}
+.mapshade a{display:block;padding:0 9px;height:28px;line-height:28px;
+  background:var(--panel);color:var(--text);font:500 11px var(--cond);
+  letter-spacing:.12em;text-transform:uppercase;text-decoration:none;
+  border:1px solid var(--rule-hi)}
+.mapshade a:hover{background:var(--panel2)}
 .leaflet-container{background:#0B1418;font-family:var(--sans);border-radius:3px}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel);color:var(--text);
   border:1px solid var(--rule-hi);border-radius:3px;box-shadow:none}
@@ -1059,6 +1068,80 @@ function parseObsPage(html){
   return found;
 }
 
+/* ---------- The last 24 hours, as measured ----------
+
+   The summary page gives one reading per station. This gives Kelp Reefs hour
+   by hour for the past day, which is what lets the page say "the water ran
+   lighter than forecast all morning" instead of just "it is light right now". */
+
+const OBS_HISTORY = OBS("WZO");       // Kelp Reefs, mid Haro Strait
+let OBSH = null, OBSH_ERR = null;
+
+const POINT_DEG = { N:0, NNE:22.5, NE:45, ENE:67.5, E:90, ESE:112.5, SE:135, SSE:157.5,
+                    S:180, SSW:202.5, SW:225, WSW:247.5, W:270, WNW:292.5, NW:315, NNW:337.5 };
+const degFromPoint = p => POINT_DEG[(p||"").toUpperCase()] ?? null;
+
+/* Rows are a date header ("11 November 2026") followed by hourly rows whose
+   first cell is "18:00" and second is "ENE 2". Newest first. */
+function parseObsHistory(html){
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const months = ["january","february","march","april","may","june","july",
+                  "august","september","october","november","december"];
+  let y = null, mo = null, d = null;
+  const out = [];
+  [...doc.querySelectorAll("tr")].forEach(tr => {
+    const cells = [...tr.children].map(td => (td.textContent||"").replace(/\s+/g," ").trim());
+    if(!cells.length) return;
+    const dm = cells[0].match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+    if(dm){
+      const i = months.indexOf(dm[2].toLowerCase());
+      if(i >= 0){ d = +dm[1]; mo = i; y = +dm[3]; }
+      return;
+    }
+    const tm = cells[0].match(/^(\d{1,2}):(\d{2})$/);
+    if(!tm || y == null || cells.length < 2) return;
+    const w = parseWindCell(cells[1]);
+    if(!w) return;
+    out.push({ ms: new Date(y, mo, d, +tm[1], +tm[2]).getTime(),
+               kn: w.kn, gust: w.gust, dir: w.dir, deg: degFromPoint(w.dir) });
+  });
+  return out.sort((a,b) => a.ms - b.ms);
+}
+
+async function loadObsHistory(){
+  const routes = [
+    ["direct", OBS_HISTORY],
+    ["via r.jina.ai", "https://r.jina.ai/" + OBS_HISTORY],
+    ["via allorigins", "https://api.allorigins.win/raw?url=" + encodeURIComponent(OBS_HISTORY)]
+  ];
+  const attempt = async ([, url]) => {
+    const ctl = new AbortController();
+    const timer = setTimeout(()=>ctl.abort(), 14000);
+    try{
+      const r = await fetch(url, {cache:"no-store", signal:ctl.signal});
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const rows = parseObsHistory(await r.text());
+      if(rows.length < 3) throw new Error("no history rows");
+      return rows;
+    } finally { clearTimeout(timer); }
+  };
+  try{
+    OBSH = await Promise.any(routes.map(attempt));
+    OBSH_ERR = null;
+    try{ localStorage.setItem("ec_obsh", JSON.stringify({at:Date.now(), rows:OBSH})); }catch(e){}
+    // Feed the measured hours into the log so the track record has something
+    // to work with from the very first run instead of after weeks of use.
+    OBSH.forEach(r => logObservations({ kelp: { kn:r.kn, gust:r.gust, when:r.ms } }));
+  }catch(agg){
+    const first = agg && agg.errors && agg.errors[0];
+    OBSH_ERR = first ? (first.name === "AbortError" ? "timed out" : first.message) : "unavailable";
+    try{
+      const c = JSON.parse(localStorage.getItem("ec_obsh") || "null");
+      if(c && Date.now() - c.at < 6*36e5) OBSH = c.rows;
+    }catch(e){}
+  }
+}
+
 function cachedObs(){
   try{
     const c = JSON.parse(localStorage.getItem("ec_obs") || "null");
@@ -1700,6 +1783,12 @@ function evaluate(routeKey, dayISO, windData, currents){
          take whichever is worse. This is what stops a 6 kn model reading
          showing "Go" when the forecast says 15. */
       let hsOff = null, bandOff = null, offWind = null, offSrc = null;
+      // How sheltered this leg is relative to open water, per the model. Kept
+      // on the record so measured open-water wind can be turned into a wave
+      // height for this leg the same way the forecast is.
+      const refWnow = refBlock && refBlock[hh] ? refBlock[hh].wind : null;
+      let shelterRatio = (refWnow && refWnow > 0.5)
+        ? Math.max(0.15, Math.min(1.3, w.wind / refWnow)) : 1;
       // What the official forecast says for THIS hour, not for the whole day.
       const hourOff = MANUAL_KN
         ? { kn: MANUAL_KN, label: "the figure you entered", text: "", manual: true }
@@ -1709,6 +1798,7 @@ function evaluate(routeKey, dayISO, windData, currents){
         // Shelter ratio, clamped so a near-calm reference cannot blow up.
         const shelter = (refW && refW > 0.5)
           ? Math.max(0.15, Math.min(1.3, w.wind / refW)) : 1;
+        shelterRatio = shelter;
         const cand = hourOff.kn * shelter;
         if(cand > w.wind){ offWind = cand; offSrc = hourOff; }
       }
@@ -1765,7 +1855,8 @@ function evaluate(routeKey, dayISO, windData, currents){
       legs.push({name:leg.name, note:leg.note, wind:w.wind, gust:w.gust, from:w.from,
                  hs, tp, steep, blocked, cur, opposed, band, reasons,
                  hsOff, bandOff, offWind, offKn: offSrc ? offSrc.kn : null,
-                 offLabel: offSrc ? offSrc.label : null});
+                 offLabel: offSrc ? offSrc.label : null, shelter: shelterRatio,
+                 legRef: leg});
     });
     if(legs.length) hours.push({hh, ms, legs, band: legs.map(l=>l.band).reduce(worseOf,"green")});
   }
@@ -2292,6 +2383,8 @@ function renderBulletin(ev){
    If Leaflet fails to load (offline, blocked CDN) this falls back to a plain
    marker plot so the page still tells you where things are. */
 let MAP = null;
+let MAP_DARK = (() => { try { return localStorage.getItem("map_dark") !== "0"; }
+                        catch(e){ return true; } })();
 
 function mapData(route, ev, focusHH){
   const nmBetween = (a,b) => {
@@ -2383,7 +2476,90 @@ function renderObs(ev, zones){
       they disagree with the forecast, they are the ones standing in the water.</div></div>`;
 }
 
-/* How this page's own past forecasts have compared with the stations. */
+/* ---------- Today so far: measured against predicted ----------
+
+   For every past hour that has both a Kelp Reefs reading and an evaluated
+   hour, the measured open-water wind is run through the same shelter ratio
+   and the same fetch physics as the forecast. So the two wave columns are
+   produced by identical arithmetic and differ only in their wind input —
+   which is the only way the comparison means anything. */
+function renderSoFar(route, ev){
+  if(!OBSH || !OBSH.length) return "";
+
+  // The leg this route is actually judged on.
+  const legIdx = route.legs.reduce((best, l, i, arr) =>
+    Math.max(...Object.values(l.fetch)) > Math.max(...Object.values(arr[best].fetch)) ? i : best, 0);
+  const legName = route.legs[legIdx].name;
+
+  const rows = [];
+  ev.hours.forEach(h => {
+    if(h.ms > Date.now()) return;
+    const l = h.legs[legIdx];
+    if(!l) return;
+    // Nearest reading within half an hour of the top of the hour.
+    const o = OBSH.reduce((best, r) => {
+      const d = Math.abs(r.ms - h.ms);
+      return d < 30*60000 && (!best || d < Math.abs(best.ms - h.ms)) ? r : best;
+    }, null);
+    if(!o || o.deg == null) return;
+
+    const leg = route.legs[legIdx];
+    const legKn = o.kn * (l.shelter || 1);
+    const sea = fetchLimitedSea(legKn, fetchMetres(leg, o.deg));
+    let obsHs = sea.hs;
+    /* The predicted column has already been through wind-against-current
+       steepening, so the measured column must be too, or the two are not
+       comparable. Opposition is recomputed from the MEASURED direction. */
+    const setDeg = l.cur >= 0 ? leg.floodSet : (leg.floodSet + 180) % 360;
+    const obsOpposed = Math.abs(l.cur) >= WAC.minCurrentKn &&
+      angGap((o.deg + 180) % 360, setDeg) >= WAC.oppositionDeg;
+    if(obsOpposed) obsHs = currentSteepening(obsHs, sea.tp, Math.abs(l.cur)).hs;
+    const e = eff(l);
+    rows.push({ hh:h.hh, obsKn:o.kn, obsDir:o.dir, legKn, obsHs,
+                fcKn:e.wind, fcHs:e.hs, scaled:e.scaled, opp:obsOpposed });
+  });
+  if(rows.length < 2) return "";
+
+  const dKn = rows.map(r => r.fcKn - r.legKn).sort((a,b)=>a-b);
+  const dHs = rows.map(r => r.fcHs - r.obsHs).sort((a,b)=>a-b);
+  const med = a => a.length % 2 ? a[a.length>>1] : (a[(a.length>>1)-1] + a[a.length>>1])/2;
+  const mKn = med(dKn), mHs = med(dHs);
+  const dir = mHs > 0.04 ? "smaller" : mHs < -0.04 ? "bigger" : "about what was predicted";
+  const tone = mHs > 0.04 ? "good" : mHs < -0.04 ? "bad" : "";
+
+  const body = rows.map(r => `<tr>
+    <td>${esc(pretty(r.hh))}</td>
+    <td class="kn">${esc(r.obsDir||"")} ${Math.round(r.obsKn)} kn</td>
+    <td class="kn">${r.obsHs.toFixed(2)} m</td>
+    <td class="kn">${r.fcHs.toFixed(2)} m</td>
+    <td class="${r.fcHs - r.obsHs > 0.05 ? "good" : r.obsHs - r.fcHs > 0.05 ? "bad" : ""}">${
+      (r.fcHs - r.obsHs > 0 ? "+" : "")}${(r.fcHs - r.obsHs).toFixed(2)}</td>
+  </tr>`).join("");
+
+  const first = rows[0], last = rows[rows.length-1];
+  return `<h2>Today so far &mdash; measured against predicted</h2>
+    <div class="bulletin">
+      <span class="lbl">${esc(pretty(first.hh))}&ndash;${esc(pretty(last.hh))} on ${esc(legName)}</span>
+      <div class="w">Kelp Reefs has been reading a median
+        <strong class="${tone}">${Math.abs(mKn).toFixed(0)} kn ${mKn > 0 ? "under" : "over"}</strong>
+        what this page was using, which on this leg works out
+        <strong class="${tone}">${Math.abs(mHs).toFixed(2)} m ${dir}</strong>.
+        ${mHs > 0.04
+          ? "If the afternoon behaves like the morning, the figures ahead are pessimistic by roughly that much."
+          : mHs < -0.04
+          ? "The water has been rougher than predicted. Do not lean on the figures ahead."
+          : "Prediction and water have been tracking each other."}</div>
+      <table class="periods">
+        <thead><tr><th>Hour</th><th>Measured wind</th><th>Actual sea</th><th>Predicted</th><th>Diff</th></tr></thead>
+        <tbody>${body}</tbody></table>
+      <div class="w" style="color:var(--faint);font-size:13px">Actual sea is the measured Kelp Reefs
+        wind put through this leg's shelter and fetch &mdash; the same arithmetic as the prediction,
+        with real wind instead of forecast wind. There is no wave buoy in these waters, so this is
+        still a calculation, not a measurement of the sea itself.</div>
+    </div>`;
+}
+
+/* How this page's own past forecasts have compared with the stations. *//* How this page's own past forecasts have compared with the stations. */
 function renderAccuracy(){
   const b = biasReport();
   if(!b.n){
@@ -2466,19 +2642,38 @@ function initStationMap(route, ev, focusHH){
   const {stations, hour, nmBetween} = mapData(route, ev, focusHH);
   MAP = L.map(el, {scrollWheelZoom:false, attributionControl:true});
 
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-    maxZoom:19, subdomains:"abcd",
-    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  /* CARTO's free tiles now demand an API key, so the base is OpenStreetMap's
+     own tile server — genuinely free and no registration. It is a light map,
+     so a CSS filter on the tile pane darkens it to match the page; the filter
+     is a class on the container, which means the Plain toggle costs no extra
+     tile requests. */
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom:19,
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(MAP);
-  /* OpenSeaMap seamarks carry traffic separation schemes and shipping lanes,
-     which swamp a small map with purple. Useful occasionally, so it's offered
-     as a toggle rather than forced on. */
+
   const seamarks = L.tileLayer("https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png", {
-    maxZoom:18, opacity:0.85,
+    maxZoom:18, opacity:0.9,
     attribution:'Seamarks &copy; <a href="https://www.openseamap.org">OpenSeaMap</a>'
   });
   L.control.layers(null, {"Buoys and shipping lanes": seamarks},
     {collapsed:false, position:"topright"}).addTo(MAP);
+
+  const shade = L.control({position:"topleft"});
+  shade.onAdd = () => {
+    const d = L.DomUtil.create("div", "leaflet-bar mapshade");
+    d.innerHTML = `<a href="#" title="Light or dark map">${MAP_DARK ? "Plain" : "Dark"}</a>`;
+    L.DomEvent.on(d, "click", (e) => {
+      L.DomEvent.stop(e);
+      MAP_DARK = !MAP_DARK;
+      try{ localStorage.setItem("map_dark", MAP_DARK ? "1" : "0"); }catch(err){}
+      el.classList.toggle("darkmap", MAP_DARK);
+      d.querySelector("a").textContent = MAP_DARK ? "Plain" : "Dark";
+    });
+    return d;
+  };
+  shade.addTo(MAP);
+  el.classList.toggle("darkmap", MAP_DARK);
 
   const pts = [];
 
@@ -2703,7 +2898,8 @@ function render(ev, win, model){
     route.hazards.map(x=>`<div class="note warn">${esc(x)}</div>`).join("");
 
   const midHH = (ev.hours[Math.floor(ev.hours.length/2)]||{}).hh;
-  h += renderAccuracy()
+  h += renderSoFar(route, ev)
+     + renderAccuracy()
      + renderCheat(route, ev)
      + renderStationMap(route, ev, win ? win.depHH : midHH, win)
      + renderLinks(route);
@@ -2823,6 +3019,10 @@ async function run(e){
         OBS_PENDING = false;
         if(stillCurrent()) draw();
       });
+    }
+    // The past 24 hours, for the measured-against-predicted panel.
+    if(!OBSH){
+      loadObsHistory().then(() => { if(stillCurrent()) draw(); });
     }
   }catch(err){
     $("out").innerHTML = `<div class="note err"><strong>Couldn't build the forecast.</strong><br>
